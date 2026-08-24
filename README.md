@@ -14,7 +14,7 @@ packages/db_mcp/   единственный шлюз к БД: безопасно
 packages/app/      FastAPI-приложение: конвейер text-to-SQL поверх db_mcp
 db/                SQL: схема, роли, row-level security
 scripts/seed.py    генератор синтетических данных
-docs/              документация (индекс → docs/README.md)
+docs/              документация (индекс → docs/index.md)
 ```
 
 ## Быстрый старт
@@ -39,5 +39,5 @@ make test       # pytest
 
 ## Документация
 
-Начни с [docs/README.md](docs/README.md) — там индекс всех документов и навигация
+Начни с [docs/index.md](docs/index.md) — там индекс всех документов и навигация
 по темам.
