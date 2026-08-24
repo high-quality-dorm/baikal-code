@@ -31,29 +31,47 @@ def test_decode_raises_on_bad_token(rsa_keys):
 
 
 def test_decode_rejects_token_signed_with_other_key(tmp_path, monkeypatch):
-    from app.core import config as config_mod
+    from app.core import security as security_mod
+    from app.core.config import Settings
 
     cert_path, key_path = gen_keypair(tmp_path)
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", str(key_path))
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", str(cert_path))
-    monkeypatch.setenv("JWT_ALGORITHM", "RS256")
-    config_mod._settings = None
+    monkeypatch.setattr(
+        security_mod,
+        "settings",
+        Settings(
+            jwt_algorithm="RS256",
+            jwt_private_key_path=str(key_path),
+            jwt_public_key_path=str(cert_path),
+        ),
+    )
     token = create_access_token(subject="42", role="admin")
-    config_mod._settings = None
 
     other_cert, _ = gen_keypair(tmp_path / "other")
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", str(other_cert))
-    config_mod._settings = None
+    monkeypatch.setattr(
+        security_mod,
+        "settings",
+        Settings(
+            jwt_algorithm="RS256",
+            jwt_private_key_path=str(key_path),
+            jwt_public_key_path=str(other_cert),
+        ),
+    )
     with pytest.raises(jwt.PyJWTError):
         decode_access_token(token)
 
 
 def test_create_token_raises_when_key_missing(tmp_path, monkeypatch):
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", str(tmp_path / "missing-key.pem"))
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", str(tmp_path / "missing-cert.pem"))
-    monkeypatch.setenv("JWT_ALGORITHM", "RS256")
-    from app.core import config as config_mod
+    from app.core import security as security_mod
+    from app.core.config import Settings
 
-    config_mod._settings = None
+    monkeypatch.setattr(
+        security_mod,
+        "settings",
+        Settings(
+            jwt_algorithm="RS256",
+            jwt_private_key_path=str(tmp_path / "missing-key.pem"),
+            jwt_public_key_path=str(tmp_path / "missing-cert.pem"),
+        ),
+    )
     with pytest.raises(RuntimeError, match="make certs"):
         create_access_token(subject="42", role="admin")
