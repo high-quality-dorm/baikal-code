@@ -13,3 +13,6 @@ venv/
 .env
 .env.dev
 !.env.example
+
+# generated JWT signing keys
+certs/
