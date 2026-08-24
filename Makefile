@@ -1,13 +1,31 @@
+sync:
+	uv sync --all-packages
 
 run:
 	uv run -m app
 
+db-up:
+	docker compose up -d --wait
+
+db-down:
+	docker compose down
+
+db-reset:
+	docker compose down -v
+	docker compose up -d --wait
+
+seed:
+	uv run python scripts/seed.py
+
 format:
-	uv run ruff check --select I --fix src/
-	uv run ruff check --fix src/
-	uv run ruff format src/
+	uv run ruff check --select I --fix packages/
+	uv run ruff check --fix packages/
+	uv run ruff format packages/
 
 check:
-	uv run ty check src/
-	uv run ruff check src/
-	uv run ruff format --check src/
+	uv run ty check packages/
+	uv run ruff check packages/
+	uv run ruff format --check packages/
+
+test:
+	uv run pytest tests/

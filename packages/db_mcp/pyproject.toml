@@ -1,0 +1,21 @@
+[project]
+name = "db-mcp"
+version = "0.1.0"
+description = "Единственный шлюз доступа к базе данных: безопасность, валидация, аудит"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "mcp>=1.0.0",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[project.scripts]
+db-mcp = "db_mcp.server:main"
