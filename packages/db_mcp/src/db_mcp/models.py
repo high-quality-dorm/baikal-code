@@ -156,6 +156,19 @@ class AdmissionStats(BaseModel):
     avg_score: float | None = None
 
 
+class User(BaseModel):
+    """Учётная запись пользователя (auth-данные + маппинг на внутренние id)."""
+
+    id: int | None = None
+    external_id: str = Field(min_length=1, max_length=100)
+    email: str | None = Field(default=None, max_length=255)
+    password_hash: str | None = Field(default=None, max_length=255)
+    role: str = Field(min_length=1, max_length=20)
+    internal_id: int | None = None
+    display_name: str | None = Field(default=None, max_length=150)
+    is_active: bool = True
+
+
 __all__ = [
     "AcademicRecord",
     "AdmissionPlan",
@@ -172,4 +185,5 @@ __all__ = [
     "Staff",
     "Student",
     "StudentStatus",
+    "User",
 ]
