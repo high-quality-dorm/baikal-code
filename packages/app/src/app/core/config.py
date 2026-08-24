@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Dev-дефолт только для локальной разработки; в проде всегда задавать свой
-# сильный секрет (JWT_SECRET в .env). Длина >= 32 байта обязательна для HS256.
-_DEV_JWT_SECRET = "dev-only-change-me-use-strong-random-secret-0123456789"
+# Пути к ключам подписи JWT по умолчанию (генерируются командой `make certs`).
+_DEFAULT_PRIVATE_KEY = "certs/jwt-private-key.pem"
+_DEFAULT_PUBLIC_KEY = "certs/jwt-cert.pem"
 
 
 class Settings(BaseSettings):
@@ -15,18 +14,10 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    jwt_secret: str = _DEV_JWT_SECRET
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: str = "RS256"
     jwt_expires_minutes: int = 60
-
-    @field_validator("jwt_secret")
-    @classmethod
-    def _jwt_secret_must_be_long(cls, v: str) -> str:
-        if len(v.encode("utf-8")) < 32:
-            raise ValueError(
-                "jwt_secret must be at least 32 bytes for HS256 (use a strong random value)"
-            )
-        return v
+    jwt_private_key_path: str = _DEFAULT_PRIVATE_KEY
+    jwt_public_key_path: str = _DEFAULT_PUBLIC_KEY
 
 
 _settings: Settings | None = None
