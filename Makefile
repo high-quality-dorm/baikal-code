@@ -4,6 +4,14 @@ sync:
 run:
 	uv run -m app
 
+certs:
+	mkdir -p certs
+	openssl req -x509 -newkey rsa:2048 -nodes \
+	  -keyout certs/jwt-private-key.pem \
+	  -out certs/jwt-cert.pem \
+	  -days 365 \
+	  -subj "/CN=baikal-dev"
+
 db-up:
 	docker compose up -d --wait
 
