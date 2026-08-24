@@ -131,13 +131,16 @@ CREATE TABLE admission_stats (
     avg_score NUMERIC(3, 2)
 );
 
--- 16. Маппинг внешних пользователей на внутренние идентификаторы (для auth)
+-- 16. Учётные записи пользователей (логин/пароль для auth + маппинг на внутренние id)
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     external_id VARCHAR(100) NOT NULL UNIQUE,
-    role VARCHAR(20) NOT NULL,
-    internal_id INT,          -- student_id или staff_id
-    display_name VARCHAR(150)
+    email VARCHAR(255) UNIQUE,              -- логин (может быть NULL на время перехода)
+    password_hash VARCHAR(255),             -- bcrypt-хэш пароля
+    role VARCHAR(20) NOT NULL,              -- applicant | student | teacher | admin
+    internal_id INT,                        -- student_id или staff_id
+    display_name VARCHAR(150),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- 17. Журнал аудита запросов
