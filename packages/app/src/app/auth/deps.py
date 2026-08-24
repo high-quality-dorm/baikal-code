@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Annotated
 
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from app.core.security import decode_access_token
 
@@ -54,10 +55,14 @@ def get_optional_context(
     )
 
 
-def require_role(*roles: str) -> Callable[[AuthContext], None]:
-    """Возвращает зависимость, требующую одну из указанных ролей (иначе 403)."""
+def require_role(*roles: str) -> Callable[..., None]:
+    """Возвращает зависимость, требующую одну из указанных ролей (иначе 403).
 
-    def checker(ctx: AuthContext) -> None:
+    Текущий пользователь берётся из Bearer-токена через get_current_user,
+    поэтому require_role можно передавать напрямую в Depends.
+    """
+
+    def checker(ctx: Annotated[AuthContext, Depends(get_current_user)]) -> None:
         if not ctx.role or ctx.role not in roles:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
