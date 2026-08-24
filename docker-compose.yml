@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: baikal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-owner}
+      POSTGRES_DB: ${POSTGRES_DB:-university}
+      APP_RO_PASSWORD: ${APP_RO_PASSWORD:-ro_secret}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-admin_secret}
+      APP_AUDIT_PASSWORD: ${APP_AUDIT_PASSWORD:-audit_secret}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_owner} -d ${POSTGRES_DB:-university}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
