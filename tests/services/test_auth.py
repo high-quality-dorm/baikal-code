@@ -11,6 +11,8 @@ from app.services.auth import (
 )
 from app.services.providers import InMemoryAuthStore
 
+pytestmark = pytest.mark.usefixtures("rsa_keys")
+
 
 def make_service():
     return AuthService(InMemoryAuthStore())
