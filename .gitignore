@@ -1,0 +1,12 @@
+# python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+.ruff_cache/
+
+# virtual environments
+.venv/
+venv/
+
+debug/
