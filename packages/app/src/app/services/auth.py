@@ -19,6 +19,10 @@ from app.core.security import (
 )
 from app.services.providers import UserCredentialsStore
 
+# Заглушка bcrypt-хэша для выравнивания времени ответа при неизвестном логине,
+# неактивной учётке или отсутствии хэша пароля (защита от timing-оракла).
+_DUMMY_HASH = "$2b$12$QP7uqiL9MzVEZ7g728jYJOAjPP.BRIEA5HoEHLXZrNvc3A5dV/CCW"
+
 
 class AuthError(Exception):
     """Базовая ошибка auth."""
@@ -45,17 +49,16 @@ class AuthService:
     async def authenticate(self, login: str, password: str) -> TokenResponse:
         """Проверяет логин/пароль и выдаёт JWT."""
         creds = await self.store.get_credentials(login)
-        if creds is None or not creds.is_active:
+        if creds is None or not creds.is_active or not creds.password_hash:
+            # Всегда делаем bcrypt-сравнение, чтобы время ответа не зависело
+            # от того, существует ли учётка / активна ли она / есть ли хэш.
+            verify_password(password, _DUMMY_HASH)
             raise AuthenticationError("Неверный логин или пароль")
-        if not creds.password_hash or not verify_password(
-            password, creds.password_hash
-        ):
+        if not verify_password(password, creds.password_hash):
             raise AuthenticationError("Неверный логин или пароль")
-        subject = (
-            str(creds.internal_id) if creds.internal_id is not None else str(creds.id)
-        )
+        assert creds.id is not None, "creds from store always have an id"
         token = create_access_token(
-            subject=subject,
+            subject=str(creds.id),
             role=creds.role,
             email=creds.email,
         )
@@ -71,17 +74,21 @@ class AuthService:
         )
 
     async def create_user(self, data: UserCreate) -> UserOut:
-        """Создаёт учётку (email уникален)."""
+        """Создаёт учётку (email и external_id уникальны)."""
         existing = await self.store.get_credentials(data.email)
         if existing is not None:
             raise DuplicateLoginError("Логин уже занят")
+        if data.external_id is not None:
+            external = await self.store.get_credentials(data.external_id)
+            if external is not None:
+                raise DuplicateLoginError("Логин уже занят")
         user = await self.store.persist(
             Credentials(
                 id=None,
                 external_id=data.external_id or f"user-{data.email}",
                 email=data.email,
                 password_hash=hash_password(data.password),
-                role=data.role.value if hasattr(data.role, "value") else str(data.role),
+                role=data.role.value,
                 display_name=data.display_name,
                 is_active=True,
             )
@@ -103,9 +110,7 @@ class AuthService:
         if user is None:
             return None
         if data.role is not None:
-            user.role = (
-                data.role.value if hasattr(data.role, "value") else str(data.role)
-            )
+            user.role = data.role.value
         if data.is_active is not None:
             user.is_active = data.is_active
         if data.display_name is not None:

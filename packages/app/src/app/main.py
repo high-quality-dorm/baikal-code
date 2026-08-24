@@ -29,4 +29,11 @@ def create_app() -> FastAPI:
     return app
 
 
+def main() -> None:
+    """Запускает dev-сервер uvicorn (используется console-скриптом `app`)."""
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=False)
+
+
 app = create_app()

@@ -2,7 +2,7 @@ import pytest
 
 from app.auth.schemas import Credentials, UserCreate, UserUpdate
 from app.api.schemas import Role
-from app.core.security import hash_password
+from app.core.security import hash_password, decode_access_token
 from app.services.auth import (
     AdminExistsError,
     AuthenticationError,
@@ -79,6 +79,28 @@ async def test_create_user_duplicate():
         password_hash=hash_password("pw123456"), role="student", is_active=True))
     with pytest.raises(DuplicateLoginError):
         await svc.create_user(UserCreate(email="a@b.c", password="pw123456", role=Role.STUDENT))
+
+
+@pytest.mark.anyio
+async def test_create_user_duplicate_external_id():
+    svc = make_service()
+    await svc.store.add(Credentials(
+        id=None, external_id="e1", email="a@b.c",
+        password_hash=hash_password("pw123456"), role="student", is_active=True))
+    with pytest.raises(DuplicateLoginError):
+        await svc.create_user(UserCreate(
+            email="other@b.c", password="pw123456", role=Role.STUDENT, external_id="e1"))
+
+
+@pytest.mark.anyio
+async def test_token_sub_is_credentials_id_even_with_internal_id():
+    svc = make_service()
+    saved = await svc.store.add(Credentials(
+        id=None, external_id="e1", email="a@b.c", internal_id=999,
+        password_hash=hash_password("pw123456"), role="admin", is_active=True))
+    token = await svc.authenticate("a@b.c", "pw123456")
+    payload = decode_access_token(token.access_token)
+    assert payload["sub"] == str(saved.id)
 
 
 @pytest.mark.anyio

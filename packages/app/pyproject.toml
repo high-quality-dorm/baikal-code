@@ -23,7 +23,7 @@ build-backend = "uv_build"
 package = true
 
 [project.scripts]
-app = "app:main"
+app = "app.main:main"
 
 [dependency-groups]
 dev = [
