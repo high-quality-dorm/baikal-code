@@ -31,6 +31,8 @@
 | Что                                                   | Расположение                                 |
 | ----------------------------------------------------- | -------------------------------------------- |
 | Доменные сущности БД (с PII-метками)                  | `packages/db_mcp/src/db_mcp/models.py`       |
+| Модули шлюза db_mcp (access/validate/schema/audit)    | `packages/db_mcp/src/db_mcp/`                 |
+| MCP-сервер шлюза (get_schema, execute_query)          | `packages/db_mcp/src/db_mcp/server.py`        |
 | API-схемы (Role, Question, Answer, QueryMeta)         | `packages/app/src/app/api/schemas.py`        |
 | Схема БД (17 таблиц)                                  | `db/01_schema.sql`                           |
 | Роли и права (app_ro/app_admin/app_audit, PII-колонки) | `db/02_roles.sql`                            |

@@ -31,16 +31,25 @@ PostgreSQL (roles + column-masking + RLS)
 
 ### packages/db_mcp
 Единственный шлюз доступа к базе данных. Всё, что касается безопасности, живёт здесь:
-- доступ к PostgreSQL (asyncpg);
-- установка RLS-контекста (`SET LOCAL app.role`, `app.user_id`);
-- ролевое маскирование описания схемы (PII-колонки скрываются от роли);
-- аудит запросов (запись в `query_log`);
-- FastMCP-сервер поверх этого.
+- `access.py` — пулы соединений asyncpg по ролям PostgreSQL (`app_ro` /
+  `app_admin` / `app_audit`) и установка RLS-контекста
+  (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
+- `validate.py` — валидация SQL (sqlglot): ровно один read-only SELECT,
+  запрет опасных функций, гарантированный лимит строк (`MAX_ROWS = 200`);
+- `schema.py` — маскированное описание схемы для LLM из живого каталога БД
+  (PII-колонки скрываются на уровне прав роли) + русские описания таблиц;
+- `audit.py` — запись запросов в `query_log` через выделенную роль `app_audit`;
+- `server.py` — MCP-сервер (mcp 2.0, класс `MCPServer`) на stdio-транспорте.
+
+Инструменты MCP-сервера:
+- `get_schema(role)` — маскированное описание схемы под роль (для генерации SQL);
+- `execute_query(sql, role, user_id)` — валидация → исполнение с RLS → аудит.
 
 **Доменные сущности БД** — в `packages/db_mcp/src/db_mcp/models.py`. PII-поля
-помечены `sensitive=True` (студенты: `name`, `surname`, `patronymic`, `passport`).
-Они доступны только роли администрации и маскируются для остальных ролей, не попадая
-в описание схемы для LLM.
+студентов (`name`, `surname`, `patronymic`, `passport`) помечены комментарием
+`# sensitive`: доступны только роли администрации, для остальных ролей физически
+скрыты (колоночные гранты) и не попадают в описание схемы для LLM. Список
+PII-колонок для маскирования описания схемы — в `schema.py` (`SENSITIVE_COLUMNS`).
 
 ### packages/app
 FastAPI-приложение: сам конвейер text-to-SQL поверх `db_mcp`.

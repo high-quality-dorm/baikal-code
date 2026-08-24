@@ -29,6 +29,8 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_admin;
 CREATE ROLE app_audit LOGIN PASSWORD :'app_audit_pw';
 GRANT USAGE ON SCHEMA public TO app_audit;
 GRANT SELECT, INSERT ON query_log TO app_audit;
+-- USAGE на последовательность id (BIGSERIAL), иначе INSERT без id не сработает
+GRANT USAGE ON SEQUENCE query_log_id_seq TO app_audit;
 
 -- Закрываем PII-колонки для app_ro (рабочая роль не видит персональные данные)
 REVOKE SELECT (name, surname, patronymic, passport) ON students FROM app_ro;

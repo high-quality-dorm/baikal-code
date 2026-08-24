@@ -5,9 +5,10 @@ description = "Единственный шлюз доступа к базе да
 requires-python = ">=3.12"
 dependencies = [
     "asyncpg>=0.31.0",
-    "mcp>=1.0.0",
+    "mcp>=2.0.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
+    "sqlglot>=25.0.0",
 ]
 
 [build-system]
