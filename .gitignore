@@ -9,4 +9,7 @@ __pycache__/
 .venv/
 venv/
 
-debug/
+# environment variables
+.env
+.env.dev
+!.env.example
