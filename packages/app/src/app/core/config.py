@@ -20,12 +20,4 @@ class Settings(BaseSettings):
     jwt_public_key_path: str = _DEFAULT_PUBLIC_KEY
 
 
-_settings: Settings | None = None
-
-
-def get_settings() -> Settings:
-    """Возвращает единственный экземпляр настроек (кэш)."""
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-    return _settings
+settings = Settings()

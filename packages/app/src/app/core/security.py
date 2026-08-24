@@ -12,7 +12,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from .config import get_settings
+from .config import settings
 
 
 def _load_private_key(path: str) -> rsa.RSAPrivateKey:
@@ -73,7 +73,6 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(subject: str, role: str, email: str | None = None) -> str:
     """Создаёт JWT access-токен (RS256), подписанный закрытым ключом."""
-    settings = get_settings()
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
@@ -92,6 +91,5 @@ def decode_access_token(token: str) -> dict:
 
     При невалидном/просроченном токене бросает jwt.PyJWTError.
     """
-    settings = get_settings()
     key = _public_key(settings.jwt_public_key_path)
     return jwt.decode(token, key, algorithms=[settings.jwt_algorithm])
