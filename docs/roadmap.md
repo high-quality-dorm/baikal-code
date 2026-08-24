@@ -14,6 +14,7 @@
 | 2 | Модели | Доменные сущности БД → `db_mcp/models.py`; API-схемы → `app/api/schemas.py` | `37318c8` |
 | 3 | БД в docker | PostgreSQL 16 (docker-compose); схема (17 таблиц), роли, RLS; верифицирована матрица RLS | `6968339` |
 | 4 | Сид | Генератор синтетики `scripts/seed.py` (faker, детерминированный); RLS проверен на данных | `5a64992` |
+
 | 5 | Ядро db_mcp | Модули шлюза `access`/`validate`/`schema`/`audit`; MCP-сервер (mcp 2.0, `get_schema`/`execute_query`); валидация sqlglot; аудит в `query_log`; тесты | `c80b1cc` |
 
 ## Что дальше
@@ -67,6 +68,18 @@
   выводе, кэш.
 - Обновление `docs/architecture.md` и `docs/decisions.md`.
 
+| 6 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
+
+## Что дальше
+
+### Следующий этап: ядро db_mcp
+- Модули шлюза: `access`, `validate`, `schema`, `audit`.
+- FastMCP-сервер (`db_mcp/server.py`, точка входа `db-mcp` уже объявлена в
+  `packages/db_mcp/pyproject.toml`).
+- После ядра — реальное хранилище учёток `UserCredentialsStore` на основе `db_mcp`
+  (сейчас auth работает на in-memory моке).
+
+
 ### После: приложение (packages/app)
 - Конвейер text-to-SQL: генерация SQL через LLM (LangChain), валидация,
   ролевое маскирование схемы, вызов шлюза через MCP, форматирование ответа.
@@ -80,6 +93,9 @@
 - Шлюз `db_mcp` работает как MCP-сервер на stdio: валидация SQL, исполнение
   с RLS-контекстом, маскирование схемы под роль, аудит в `query_log`
   (запросы — только SELECT, лимит строк 200).
+- Auth реализован (JWT по логину/паролю, управление учётками), но хранилище учёток
+  пока in-memory — подключение к `db_mcp` впереди.
+- Следующий шаг перед новым этапом — уточнить у пользователя план модулей `db_mcp`.
 
 ## Открытые блокеры
 

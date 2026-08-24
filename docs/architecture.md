@@ -11,7 +11,7 @@
    │  POST /ask  { question, роль, user_id }
    ▼
 packages/app  (FastAPI, конвейер text-to-SQL)
-   │  1. аутентификация/идентификация (прототип: заголовки)
+   │  1. аутентификация/идентификация (JWT: вход по логину/паролю)
    │  2. генерация SQL через LLM (LangChain, OpenAI-совместимый API)
    │  3. валидация и маскирование схемы под роль
    │  4. вызов шлюза (MCP, stdio transport)
@@ -55,8 +55,15 @@ PII-колонок для маскирования описания схемы �
 FastAPI-приложение: сам конвейер text-to-SQL поверх `db_mcp`.
 **API-схемы** — в `packages/app/src/app/api/schemas.py`: `Role`
 (applicant/student/teacher/admin), `Question`, `Answer`, `QueryMeta`.
-Роль и идентификатор пользователя передаются заголовками `X-Role` и `X-User-Id`
-(прототип auth без SSO).
+
+**Auth-подсистема** (`packages/app/src/app/auth/` + `core/security.py` + `services/`):
+- вход по логину/паролю → JWT access-токен (HS256), роль и internal_id берутся из
+  токена; пароли хэшируются bcrypt;
+- эндпоинты `/api/v1/auth/login` и `/api/v1/auth/bootstrap-admin` (создание первого
+  админа, только если админов ещё нет);
+- администратор управляет учётными записями: `POST/GET/PATCH/DELETE /api/v1/auth/users`;
+- хранилище учёток — `UserCredentialsStore` (протокол); сейчас подключён мок
+  `InMemoryAuthStore`, реальное хранилище через `db_mcp` — отдельный будущий этап.
 
 ## Модель безопасности (3 уровня)
 
@@ -86,6 +93,8 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 
 - Таблица `users`: маппинг внешнего пользователя на внутренние идентификаторы:
   `external_id` → `role` + `internal_id` (student_id или staff_id) + `display_name`.
+  Для auth добавлены колонки: `email` (логин, UNIQUE), `password_hash` (bcrypt),
+  `is_active` (деактивация учётки вместо удаления).
 - Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в
   [roles.md](roles.md).
 
