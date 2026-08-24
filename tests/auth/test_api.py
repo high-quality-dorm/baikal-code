@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -5,6 +6,8 @@ from app.core.security import hash_password
 from app.auth.schemas import Credentials
 from app.services.providers import InMemoryAuthStore
 from app.services.auth import AuthService
+
+pytestmark = pytest.mark.usefixtures("rsa_keys")
 
 
 def make_client():

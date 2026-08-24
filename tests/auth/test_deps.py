@@ -5,6 +5,8 @@ import pytest
 from app.auth.deps import AuthContext, get_current_user, require_role
 from app.core.security import create_access_token
 
+pytestmark = pytest.mark.usefixtures("rsa_keys")
+
 
 def make_credentials(role="admin", user_id="7"):
     token = create_access_token(subject=user_id, role=role, email="a@b.c")
