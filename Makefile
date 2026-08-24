@@ -26,6 +26,10 @@ check:
 	uv run ty check packages/
 	uv run ruff check packages/
 	uv run ruff format --check packages/
+	uv run python scripts/check_docs.py
+
+docs-check:
+	uv run python scripts/check_docs.py
 
 test:
 	uv run pytest tests/

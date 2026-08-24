@@ -2,7 +2,7 @@
 name = "baikal"
 version = "0.1.0"
 description = "Безопасный text-to-SQL сервис для университетской базы данных"
-readme = "README.md"
+readme = "docs/README.md"
 requires-python = ">=3.12"
 
 [tool.uv]

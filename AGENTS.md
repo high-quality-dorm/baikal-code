@@ -1,39 +1,108 @@
-
 # AGENTS.md
 
-## Project Overview
+## Обзор проекта
 
-This project is an AI-powered assistant designed to provide secure, scalable, and controlled natural language access to the university's PostgreSQL database. Functioning as a secure text-to-SQL connector, it implements a strict execution pipeline—from user query to validated database response—that heavily prioritizes query correctness, data security, and overall system stability.
+Baikal — ИИ-ассистент, обеспечивающий безопасный, масштабируемый и контролируемый
+доступ к университетской базе данных PostgreSQL на естественном языке. Это
+безопасный text-to-SQL коннектор: от запроса пользователя до валидированного ответа
+проходит строгий конвейер, который приоритизирует корректность запросов, защиту
+данных и стабильность системы.
 
-## Architecture
+Подробнее о проекте — в [docs/README.md](docs/README.md), об устройстве —
+в [docs/architecture.md](docs/architecture.md).
 
-- Think through the architecture upfront — no quick MVP "to test it first".
-- Build it properly from the start.
+## Архитектура
 
-## Commands
+- Сначала продумываем архитектуру — никаких быстрых MVP «протестировать».
+- Строим правильно с самого начала.
+- Приложение никогда не обращается к БД напрямую — только через пакет `db_mcp`.
+
+## Команды
 
 ```bash
-make run      # run the app
-make format   # format code (ruff)
-make check    # lint + type check (ruff, ty)
-uv sync       # install dependencies
+make sync       # установить зависимости (uv sync --all-packages)
+make run        # запустить приложение
+make db-up      # поднять БД в docker
+make db-down    # остановить БД
+make db-reset   # пересоздать БД с нуля (схема + роли + RLS)
+make seed       # заполнить базу синтетикой
+make format     # форматирование (ruff)
+make check      # lint + type check + проверка документации (ruff, ty, check_docs.py)
+make docs-check # только проверка документации (check_docs.py)
+make test       # pytest
 ```
 
-## Code Style
+## Стиль кода
 
-- Python 3.13 features: type hints, `str | None`, `list[T]`
-- Comments in code are welcome and encouraged for non-obvious decisions
-- Formatting and linting are done via `make format` / `make check` — use them, not the tools directly
-- Conventional commits: `init:`, `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:` (+ optional scope, e.g. `docs(ai):`)
-- Follow existing patterns in the project
-- If unsure about style or approach — ask the user
+- Python 3.12: type hints, `str | None`, `list[T]`
+- Комментарии приветствуются для неочевидных решений
+- Форматирование и линтинг — только через `make format` / `make check`
+- Conventional commits: `init:`, `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`,
+  `test:` (+ опциональный scope, например `docs(ai):`)
+- Следуем существующим паттернам проекта
+- Не уверен в стиле или подходе — спроси пользователя
 
-## Working with the AI
+## Документация
 
-- Never guess. In unclear situations don't try to figure things out on your own — stop and ask the user.
-- If something unexpected happens (errors, unusual behavior, unexpected results) — stop and ask the user.
-- Before important decisions (project structure, architecture, changing logic) — propose options and ask.
-- Clarify ambiguous requirements instead of deciding for the user.
-- Run `make format` and `make check` before committing.
-- When making changes, explain what changes and how the changed code works.
-- Minimal output — maximum usefulness.
+Документация — часть каждого изменения. Код и docs развиваются синхронно:
+любое изменение кода сопровождается обновлением соответствующих документов.
+
+### Роли документов
+
+- `docs/README.md` — для людей и отображения в GitHub: обзор, быстрый старт.
+- `docs/index.md` — навигация для ИИ: карта «что где лежит». Читай только нужные
+  документы по этому индексу, а не весь `docs/` целиком.
+- Остальные `docs/*.md` — по одному на тему (архитектура, решения, роадмап, сид, роли).
+
+### Карта документации
+
+Индекс и навигация — в `docs/index.md`. Прочитай его первым, когда нужно что-то
+найти или понять, какой документ обновить.
+
+### Триггеры обновления
+
+| Что меняется                                | Какой документ обновить             |
+| ------------------------------------------- | ----------------------------------- |
+| пакеты, модули, точки входа, поток запроса  | `docs/architecture.md`              |
+| схема БД, колонки, индексы                  | `docs/architecture.md`              |
+| роли, RLS, права, PII-политика              | `docs/roles.md` (+ `architecture.md` при изменении модели безопасности) |
+| сид: объёмы, константы, демо-пользователи   | `docs/seed.md`                      |
+| стек, паттерны, security-решения            | `docs/decisions.md`                 |
+| завершён этап / изменился следующий шаг     | `docs/roadmap.md`                   |
+| команды, быстрый старт, структура репозитория | `docs/README.md`                  |
+| добавлен/переименован/удалён любой файл `docs/*` | `docs/index.md` (всегда)      |
+
+### Процесс синхронизации (перед каждым коммитом)
+
+1. Прогнать `make check` (включает `docs-check`).
+2. Сверить с кодом: прочитать документы, описывающие затронутый код, и убедиться,
+   что имена файлов, ссылки, объёмы данных и статусы актуальны.
+3. Устаревшие документы — обновить в этом же коммите (либо отдельным `docs:`-коммитом,
+   если правок много).
+4. `docs/index.md` — всегда актуален: отражает новые/переименованные/удалённые файлы
+   `docs/` и меняющиеся темы.
+5. Если документ нужно улучшить, дополнить или переписать — делай это в рамках
+   работы, не оставляй «на потом».
+
+### Правила
+
+- Ровно один `README.md` — в `docs/`; в корне репозитория README нет.
+- Имена файлов `docs/` — нижний регистр, описательные (одно слово на тему).
+- Ссылки в документах — относительные и валидные (проверяется `docs-check`).
+- Документация пишется на русском, в едином стиле с существующими файлами.
+- Не уверен, куда должна идти информация, — спроси пользователя.
+
+## Работа с ИИ
+
+- Никогда не догадывайся. В неясной ситуации не пытайся разобраться сам — остановись
+  и спроси пользователя.
+- Если произошло что-то неожиданное (ошибки, необычное поведение, непредвиденные
+  результаты) — остановись и спроси пользователя.
+- Перед важными решениями (структура проекта, архитектура, изменение логики) —
+  предложи варианты и спроси.
+- Уточняй неоднозначные требования вместо того, чтобы решать за пользователя.
+- Перед коммитом — `make format` и `make check`.
+- Работа идёт поэтапно: этап → коммит → стоп → объяснение. Не перескакивай на
+  следующий этап без подтверждения.
+- Объясняй, что меняешь и как работает изменённый код.
+- Минимум вывода — максимум пользы.
