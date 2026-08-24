@@ -78,7 +78,7 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 - Таблица `users`: маппинг внешнего пользователя на внутренние идентификаторы:
   `external_id` → `role` + `internal_id` (student_id или staff_id) + `display_name`.
 - Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в
-  [about.md](about.md).
+  [roles.md](roles.md).
 
 ## Схема БД
 
