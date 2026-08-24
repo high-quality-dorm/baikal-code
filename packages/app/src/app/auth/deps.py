@@ -7,9 +7,12 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.security import decode_access_token
+
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @dataclass
@@ -21,38 +24,38 @@ class AuthContext:
     email: str | None = None
 
 
-def get_current_user(authorization: str | None = Header(default=None)) -> AuthContext:
-    """Разбирает Bearer-токен; при отсутствии/невалидности — 401."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Требуется авторизация")
-    token = authorization.removeprefix("Bearer ").strip()
-    try:
-        payload = decode_access_token(token)
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Невалидный или просроченный токен")
+def _context_from_token(token: str) -> AuthContext:
+    """Строит AuthContext из декодированного JWT (бросает jwt.PyJWTError)."""
+    payload = decode_access_token(token)
     return AuthContext(
         user_id=payload.get("sub"),
         role=payload.get("role"),
         email=payload.get("email"),
     )
+
+
+def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> AuthContext:
+    """Разбирает Bearer-токен; при отсутствии/невалидности — 401."""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    try:
+        return _context_from_token(credentials.credentials)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Невалидный или просроченный токен")
 
 
 def get_optional_context(
-    authorization: str | None = Header(default=None),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> AuthContext:
     """То же, но аноним при отсутствии/невалидном токене (для публичных эндпоинтов)."""
-    if not authorization or not authorization.startswith("Bearer "):
+    if credentials is None:
         return AuthContext()
-    token = authorization.removeprefix("Bearer ").strip()
     try:
-        payload = decode_access_token(token)
+        return _context_from_token(credentials.credentials)
     except jwt.PyJWTError:
         return AuthContext()
-    return AuthContext(
-        user_id=payload.get("sub"),
-        role=payload.get("role"),
-        email=payload.get("email"),
-    )
 
 
 def require_role(*roles: str) -> Callable[..., None]:
