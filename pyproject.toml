@@ -13,6 +13,7 @@ members = ["packages/db_mcp", "packages/app"]
 
 [dependency-groups]
 dev = [
+    "faker>=30.0.0",
     "pytest>=8.0.0",
     "ruff>=0.16.4",
     "ty>=0.0.74",
