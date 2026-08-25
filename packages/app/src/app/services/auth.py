@@ -91,6 +91,7 @@ class AuthService:
                 email=data.email,
                 password_hash=hash_password(data.password),
                 role=data.role.value,
+                internal_id=data.internal_id,
                 display_name=data.display_name,
                 is_active=True,
             )

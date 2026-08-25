@@ -59,6 +59,21 @@ def test_admin_can_create_user():
     assert resp.status_code == 201
 
 
+def test_admin_can_create_user_with_internal_id():
+    client = make_client()
+    client.post("/api/v1/auth/bootstrap-admin",
+                json={"email": "admin@x.ru", "password": "admin12345"})
+    login = client.post("/api/v1/auth/login",
+                        json={"email": "admin@x.ru", "password": "admin12345"}).json()
+    headers = {"Authorization": f"Bearer {login['access_token']}"}
+    resp = client.post("/api/v1/auth/users",
+                       json={"email": "stud@x.ru", "password": "stud12345",
+                             "role": "student", "internal_id": 7},
+                       headers=headers)
+    assert resp.status_code == 201
+    assert resp.json()["internal_id"] == 7
+
+
 def test_non_admin_cannot_create_user():
     client = make_client()
     client.post("/api/v1/auth/bootstrap-admin",

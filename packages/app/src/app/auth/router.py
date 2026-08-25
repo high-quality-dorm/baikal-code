@@ -57,6 +57,8 @@ async def bootstrap_admin(data: LoginRequest, service: ServiceDep):
     dependencies=[Depends(require_role(BusinessRole.ADMIN))],
 )
 async def create_user(data: UserCreate, service: ServiceDep):
+    """Создаёт учётку. Админ может указать internal_id (student_id/staff_id)
+    — связку для RLS резолвит шлюз; неверный ID даёт пустой доступ."""
     try:
         return await service.create_user(data)
     except DuplicateLoginError as exc:

@@ -62,6 +62,7 @@ async def test_bootstrap_admin_creates_when_empty():
     svc = make_service()
     out = await svc.bootstrap_admin("admin@x.ru", "admin12345")
     assert out.role == BusinessRole.ADMIN.value
+    assert out.internal_id is None
 
 
 @pytest.mark.anyio
@@ -82,6 +83,22 @@ async def test_create_user_duplicate():
         password_hash=hash_password("pw123456"), role="student", is_active=True))
     with pytest.raises(DuplicateLoginError):
         await svc.create_user(UserCreate(email="a@b.c", password="pw123456", role=BusinessRole.STUDENT))
+
+
+@pytest.mark.anyio
+async def test_create_user_persists_internal_id():
+    svc = make_service()
+    out = await svc.create_user(UserCreate(
+        email="stud@x.ru", password="stud12345", role=BusinessRole.STUDENT, internal_id=7))
+    assert out.internal_id == 7
+
+
+@pytest.mark.anyio
+async def test_create_user_internal_id_defaults_to_none():
+    svc = make_service()
+    out = await svc.create_user(UserCreate(
+        email="stud@x.ru", password="stud12345", role=BusinessRole.STUDENT))
+    assert out.internal_id is None
 
 
 @pytest.mark.anyio

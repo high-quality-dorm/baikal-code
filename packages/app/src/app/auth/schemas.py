@@ -41,6 +41,10 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     role: BusinessRole
     external_id: str | None = Field(default=None, max_length=100)
+    # Связка с человеком: student_id/staff_id. Задаётся админом вручную;
+    # резолюцию в RLS-контекст выполняет шлюз (users.id -> internal_id).
+    # Неверный ID не проверяется — даёт пустой доступ по RLS.
+    internal_id: int | None = Field(default=None, ge=1)
     display_name: str | None = Field(default=None, max_length=150)
 
 
