@@ -77,7 +77,7 @@ function Message({ message, meta, isLast }) {
 }
 
 export default function Chat() {
-  const { user, isAuthed, signOut } = useAuth();
+  const { user, session, isAuthed, signOut } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -113,19 +113,17 @@ export default function Chat() {
       { id: crypto.randomUUID(), role: "user", text: question },
     ]);
 
-    const headers = { "Content-Type": "application/json" };
-    if (user?.role) headers["X-Role"] = user.role;
-    if (user?.internal_id) headers["X-User-Id"] = String(user.internal_id);
-
     let answer;
     try {
-      answer = await ask(question, {
-        role: user?.role,
-        user_id: user?.internal_id,
-      });
+      if (!isAuthed) {
+        // Гость: /ask требует авторизацию — отвечаем локальным mock.
+        answer = mockAnswer(question);
+      } else {
+        answer = await ask(question, { token: session?.accessToken });
+      }
     } catch (err) {
       if (err instanceof EndpointMissingError) {
-        // /ask ещё не реализован на бэкенде — отвечаем локальным mock.
+        // /ask недоступен (бэкенд не запущен) — отвечаем локальным mock.
         answer = mockAnswer(question);
       } else if (err instanceof ApiError) {
         setMessages((m) => [

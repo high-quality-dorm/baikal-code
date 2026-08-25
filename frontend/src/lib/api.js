@@ -37,10 +37,9 @@ export function fetchUser(token) {
   return request("/auth/users/me", { token });
 }
 
-export async function ask(question, { role, user_id } = {}) {
+export async function ask(question, { token } = {}) {
   const headers = { "Content-Type": "application/json" };
-  if (role) headers["X-Role"] = role;
-  if (user_id) headers["X-User-Id"] = String(user_id);
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE}/ask`, {
     method: "POST",
     headers,
