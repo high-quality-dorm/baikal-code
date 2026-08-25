@@ -20,6 +20,7 @@
 | 8 | Укрепление шлюза (A) | `statement_timeout` в транзакции (10 с), сериализация создания пулов локом; ужесточение валидации: FOR UPDATE/FOR SHARE, DML в любом узле дерева, расширенный чёрный список функций | `edc5f88`, `f547e38` |
 | 9 | Set-операции (B) | Валидация принимает UNION/UNION ALL/INTERSECT/EXCEPT с зажимом верхнего LIMIT; SELECT INTO проверяется по всему дереву (INTO у UNION на первом операнде) | `99f6818` |
 | 10 | Корректность ответа (C) | Ответ `execute_query` — `columns`/`rows` (дубли колонок сохраняются, numeric строкой без потери точности); `LIMIT ALL` принимается и зажимается | `a71bc30`, `aa26c29` |
+| 11 | Схема для LLM (D) | PK/FK в описании схемы (статический `TABLE_META` — `primary_key`/`foreign_keys`) для генерации JOIN; тест-инвариант: PII-колонки не PK и не цели FK | `d899ea4` |
 
 ## Что дальше
 
@@ -32,16 +33,6 @@
   правки `auth/schemas.py`, `services/auth.py`.
 - `scripts/seed.py`: демо-роли через `BusinessRole`.
 - Docs: `architecture.md` (app зависит от db_mcp), `roles.md`.
-
-### Этап D. Схема для LLM: PK/FK и кэш
-- В описание схемы (`schema.py`) добавить первичные и внешние ключи из
-  `information_schema` (с учётом `EXCLUDED_TABLES` и маскирования PII под роль):
-  `primary_key` и `foreign_keys` для каждой таблицы — улучшение генерации JOIN.
-- TTL-кэш описания схемы по роли (настройка в `Settings`), чтобы `get_schema`
-  не бил в БД при каждом вызове.
-- Тесты `SchemaBuilder` с мок-пулом: маскирование PII (ro vs admin), PK/FK в
-  выводе, кэш.
-- Обновление `docs/architecture.md` и `docs/decisions.md`.
 
 ### После: приложение (packages/app)
 - Конвейер text-to-SQL: генерация SQL через LLM (LangChain), валидация,
