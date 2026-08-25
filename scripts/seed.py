@@ -18,6 +18,8 @@ import asyncpg
 from faker import Faker
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from db_mcp.roles import BusinessRole
+
 # Опорная дата «текущего семестра»: осенний семестр 2026/27 учебного года
 # (сентябрь 2026). Семестры отсчитываются от неё.
 REFERENCE_YEAR = 2026
@@ -644,13 +646,17 @@ async def seed_users(ctx: SeedContext) -> None:
 
     # Небольшой набор демо-аккаунтов
     users_data = [
-        ("demo_admin", "admin", None, "Ректор Иванов"),
-        ("demo_applicant", "applicant", None, "Абитуриент"),
+        ("demo_admin", BusinessRole.ADMIN.value, None, "Ректор Иванов"),
+        ("demo_applicant", BusinessRole.APPLICANT.value, None, "Абитуриент"),
     ]
     if demo_student_id:
-        users_data.append(("demo_student", "student", demo_student_id, "Студент"))
+        users_data.append(
+            ("demo_student", BusinessRole.STUDENT.value, demo_student_id, "Студент")
+        )
     if demo_teacher_id:
-        users_data.append(("demo_teacher", "teacher", demo_teacher_id, "Преподаватель"))
+        users_data.append(
+            ("demo_teacher", BusinessRole.TEACHER.value, demo_teacher_id, "Преподаватель")
+        )
 
     for external_id, role, internal_id, display in users_data:
         await ctx.conn.execute(
