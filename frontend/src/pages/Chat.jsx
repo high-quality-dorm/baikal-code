@@ -227,7 +227,7 @@ export default function Chat() {
             <div className="guest-banner__text">
               <IconAlert width={18} height={18} />
               <span>
-                Вы вошли как гость — доступны только общие агрегированные
+                Вы вошли как гость. Доступны только общие агрегированные
                 данные.{" "}
                 <Link to="/login" style={{ fontWeight: 600 }}>
                   Войдите
@@ -259,7 +259,7 @@ export default function Chat() {
               Спросите что угодно о данных университета
             </h1>
             <p className="chat__empty-sub">
-              Опишите, что хотите узнать, — Baikal построит проверенный SQL и
+              Опишите, что хотите узнать. Baikal построит проверенный SQL и
               вернёт понятный ответ.
             </p>
             <div className="chat__empty-suggest">
@@ -333,7 +333,7 @@ export default function Chat() {
           <div className="composer__footer">
             <span className="composer__hint">
               <IconSparkles width={14} height={14} />
-              Enter — отправить, Shift+Enter — новая строка
+              Enter отправить, Shift+Enter новая строка
             </span>
             {nearLimit && (
               <span className="composer__counter">

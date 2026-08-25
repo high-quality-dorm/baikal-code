@@ -7,7 +7,7 @@ export default function SiteFooter() {
       <div className="container site-footer__inner">
         <Logo />
         <p className="site-footer__note">
-          Baikal — безопасный text-to-SQL помощник для данных университета.
+          Baikal это безопасный text-to-SQL помощник для данных университета.
           Спросите по-человечески, получите проверенный ответ.
         </p>
         <nav className="site-footer__nav" aria-label="Навигация в футере">
