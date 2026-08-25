@@ -22,6 +22,7 @@
 | 10 | Корректность ответа (C) | Ответ `execute_query` — `columns`/`rows` (дубли колонок сохраняются, numeric строкой без потери точности); `LIMIT ALL` принимается и зажимается | `a71bc30`, `aa26c29` |
 | 11 | Схема для LLM (D) | PK/FK в описании схемы (статический `TABLE_META` — `primary_key`/`foreign_keys`) для генерации JOIN; тест-инвариант: PII-колонки не PK и не цели FK | `d899ea4` |
 | 12 | Роли в app и seed (E2) | app зависит от `db-mcp`; enum `Role` удалён, везде `BusinessRole`; `require_role(*BusinessRole)`; демо-роли сида через `BusinessRole` | `d2c69f8`, `ed67079` |
+| 13 | Резолюция identity | Грант `app_audit` на `users(id, internal_id)`; `resolve_internal_id` + `connection_for` (users.id → internal_id для RLS); аудит пишет `users.id`; контракт MCP-инструмента обновлён | `f88d2f1`, `1fed9d4`, `60a0eaf` |
 
 ## Что дальше
 
@@ -34,20 +35,20 @@
 а шлюз сам резолвит его в доменный `internal_id` (student_id/staff_id) через
 служебную роль `app_audit`. Приложение не знает про `internal_id`.
 
-- [ ] **Шаг 13.1** Права: `app_audit` получает `SELECT (id, internal_id) ON users`
+- [x] **Шаг 13.1** Права: `app_audit` получает `SELECT (id, internal_id) ON users`
       (нужно резолверу). Обновить `docs/roles.md`, ADR.
-- [ ] **Шаг 13.2** Резолвер `resolve_internal_id(pools, user_id)`:
+- [x] **Шаг 13.2** Резолвер `resolve_internal_id(pools, user_id)`:
       `SELECT internal_id FROM users WHERE id = $1` через пул `app_audit`.
       `connection_for` резолвит `user_id` и ставит `app.user_id = internal_id`.
-      Несуществующий `users.id`/NULL → `app.user_id = NULL` → нет доступа по RLS
-      (безопасно, без ошибки). RLS-политики не меняются.
-- [ ] **Шаг 13.3** Аудит: в `query_log.user_id` писать номер учётки (`users.id`),
+      Несуществующий `users.id`/NULL → `app.user_id` не ставится (настройка
+      отсутствует → deny по RLS, безопасно, без ошибки). RLS-политики не меняются.
+- [x] **Шаг 13.3** Аудит: в `query_log.user_id` писать номер учётки (`users.id`),
       а не резолвленный `internal_id`.
-- [ ] **Шаг 13.4** Контракт: в MCP-инструменте параметр `user_id` документально
+- [x] **Шаг 13.4** Контракт: в MCP-инструменте параметр `user_id` документально
       трактуется как `users.id` (номер учётки); описание инструмента обновить.
-- [ ] **Шаг 13.5** Тесты: резолвер (найден/NULL/несуществующий), NULL-поведение
+- [x] **Шаг 13.5** Тесты: резолвер (найден/NULL/несуществующий), NULL-поведение
       `connection_for`, аудит с `users.id`. Обновить `test_access`, `test_server`.
-- [ ] `make check`, `make test` → коммит → стоп → объяснение.
+- [x] `make check`, `make test` → коммит → стоп → объяснение.
 
 ### Этап 14 — Auth: internal_id в учётках (packages/app)
 Цель: админ при создании учётки вручную указывает `internal_id` (student_id/
@@ -97,7 +98,8 @@ staff_id). JWT `sub` остаётся номером учётки (`users.id`) �
 - RLS работает: студент видит только своё, преподаватель — только свои курсы,
   администрация — всё (включая PII).
 - Шлюз `db_mcp` работает как MCP-сервер на stdio: валидация SQL, исполнение
-  с RLS-контекстом, маскирование схемы под роль, аудит в `query_log`
+  с RLS-контекстом (шлюз резолвит `users.id` → `internal_id` через
+  `app_audit`), маскирование схемы под роль, аудит в `query_log`
   (запросы — только SELECT, лимит строк 200).
 - Auth реализован (JWT по логину/паролю, управление учётками), но хранилище
   учёток пока in-memory — подключение к `db_mcp` впереди.

@@ -49,8 +49,11 @@ PostgreSQL (roles + column-masking + RLS)
   `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT;
   **резолюция identity**: `connection_for` принимает `user_id` = номер учётки
   (`users.id`), резолвит его в `internal_id` через пул `app_audit` и ставит
-  `app.user_id = internal_id` (для admin/applicant — NULL, что безопасно:
-  RLS-политики для них не зависят от `user_id`);
+  `app.user_id = internal_id`. Если internal_id отсутствует (admin/applicant,
+  несуществующий `users.id`) — `app.user_id` не ставится вовсе: PostgreSQL
+  хранит NULL в GUC как пустую строку, которая ломала бы политику
+  преподавателя (`current_setting(...)::int`); без настройки
+  `current_setting('app.user_id', true)` даёт NULL → RLS deny-by-default.
 - `validate.py` — валидация SQL (sqlglot): ровно один read-only запрос —
   SELECT или set-операция (UNION/INTERSECT/EXCEPT), запрет опасных функций
   (включая nextval/pg_advisory_*), запрет DML в любом узле дерева
