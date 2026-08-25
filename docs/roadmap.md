@@ -19,6 +19,7 @@
 | 7 | Роли db_mcp (E) | Канонический вокабуляр `BusinessRole`/`DbPool` в `roles.py`; единый маппинг пулов, `Pools.pool`/`dsn_for`; тесты маппинга и согласованности с RLS | `11a9637` |
 | 8 | Укрепление шлюза (A) | `statement_timeout` в транзакции (10 с), сериализация создания пулов локом; ужесточение валидации: FOR UPDATE/FOR SHARE, DML в любом узле дерева, расширенный чёрный список функций | `edc5f88`, `f547e38` |
 | 9 | Set-операции (B) | Валидация принимает UNION/UNION ALL/INTERSECT/EXCEPT с зажимом верхнего LIMIT; SELECT INTO проверяется по всему дереву (INTO у UNION на первом операнде) | `99f6818` |
+| 10 | Корректность ответа (C) | Ответ `execute_query` — `columns`/`rows` (дубли колонок сохраняются, numeric строкой без потери точности); `LIMIT ALL` принимается и зажимается | `a71bc30`, `aa26c29` |
 
 ## Что дальше
 
@@ -31,15 +32,6 @@
   правки `auth/schemas.py`, `services/auth.py`.
 - `scripts/seed.py`: демо-роли через `BusinessRole`.
 - Docs: `architecture.md` (app зависит от db_mcp), `roles.md`.
-
-### Этап C. Корректность ответа `execute_query`
-- Новый формат ответа: `columns` + `rows` (массив массивов). Колонки берутся из
-  `record.keys()` — порядок и дубли сохраняются. Сейчас `dict(record)` молча
-  теряет колонки при `SELECT *` из JOIN с одинаковыми именами.
-- `Decimal` → строка (потеря точности для numeric исчезает).
-- `LIMIT ALL` (валидный PostgreSQL) — предобработка `LIMIT ALL` → большой лимит
-  перед парсингом, иначе sqlglot падает с ложной ошибкой.
-- Тесты; обновление `packages/db_mcp/README.md` и `docs/architecture.md`.
 
 ### Этап D. Схема для LLM: PK/FK и кэш
 - В описание схемы (`schema.py`) добавить первичные и внешние ключи из
