@@ -16,25 +16,13 @@
 | 4 | Сид | Генератор синтетики `scripts/seed.py` (faker, детерминированный); RLS проверен на данных | `5a64992` |
 | 5 | Ядро db_mcp | Модули шлюза `access`/`validate`/`schema`/`audit`; MCP-сервер (mcp 2.0, `get_schema`/`execute_query`); валидация sqlglot; аудит в `query_log`; тесты | `c80b1cc` |
 | 6 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
+| 7 | Роли db_mcp (E) | Канонический вокабуляр `BusinessRole`/`DbPool` в `roles.py`; единый маппинг пулов, `Pools.pool`/`dsn_for`; тесты маппинга и согласованности с RLS | `11a9637` |
+| 8 | Укрепление шлюза (A) | `statement_timeout` в транзакции (10 с), сериализация создания пулов локом; ужесточение валидации: FOR UPDATE/FOR SHARE, DML в любом узле дерева, расширенный чёрный список функций | `edc5f88`, `f547e38` |
 
 ## Что дальше
 
 Запланированные этапы улучшения `db_mcp` и приложения. Каждый — реализация →
 `make check` → коммит → объяснение пользователю → подтверждение на следующий.
-
-### Этап E. Унификация маппингов ролей в db_mcp
-- Новый модуль `db_mcp/roles.py`: канонический вокабуляр ролей —
-  `BusinessRole(str, Enum)` (applicant/student/teacher/admin) и `DbPool(Enum)`
-  (ro/admin/audit). Единый источник вместо констант в `access.py`.
-- `access.py`: единый словарь `_BUSINESS_ROLE_TO_POOL: dict[BusinessRole, DbPool]`;
-  `BUSINESS_ROLES` выводится из `BusinessRole`; один метод `Pools.pool(db_pool)`
-  и `Settings.dsn_for(db_pool)`; `pool_for_role` нормализует `BusinessRole(role)`;
-  удалить строковые ключи «ro/admin», ветку `key == "admin"` и дублирующую
-  проверку роли в `connection_for`.
-- Тесты: `test_access.py` (маппинг всех ролей, нормализация, `UnknownRoleError`),
-  новый `test_roles.py` (литералы ролей в `db/03_rls.sql` ⊆ `BusinessRole`).
-- Docs: `architecture.md` (единый источник ролей), `decisions.md` (новый ADR),
-  `roles.md` — в рамках этапа.
 
 ### Этап E2. Роли в app и seed (после E)
 - `app`: зависимость `db-mcp` в `pyproject.toml`; удалить enum `Role` из
@@ -42,23 +30,6 @@
   правки `auth/schemas.py`, `services/auth.py`.
 - `scripts/seed.py`: демо-роли через `BusinessRole`.
 - Docs: `architecture.md` (app зависит от db_mcp), `roles.md`.
-
-### Этап A. Устойчивость и валидация (критичные)
-- `statement_timeout` (10 с по умолчанию, настройка в `Settings`) в начале
-  транзакции `connection_for` — защита от «зависших» SELECT (сейчас тяжёлый
-  запрос может держать соединение пула вечно).
-- Фикс гонки ленивого создания пулов в `Pools._get` (`asyncio.Lock` +
-  пере-проверка) — иначе два параллельных первых обращения создают два пула.
-- Запрет `FOR UPDATE` / `FOR SHARE` в `validate.py` (defense-in-depth).
-- Расширение `FORBIDDEN_FUNCTIONS`: `nextval`/`currval`/`setval`,
-  `pg_advisory_*`, `pg_notify`, `lo_open/close/unlink/put/truncate`,
-  `pg_export_snapshot`.
-- **Закрыть гэп валидации**: DML в любом узле дерева. Сейчас
-  `WITH del AS (DELETE ... RETURNING *) SELECT * FROM del` проходит проверку
-  (корень — `Select`), блокируется только грантами БД. Отклонять
-  `Delete/Insert/Update/Merge/Command` где угодно в `walk()`.
-- Регресс-тесты `validate`; обновление `docs/architecture.md`,
-  `docs/decisions.md` (ADR 13 + новый ADR про timeout).
 
 ### Этап B. Поддержка set-операций
 - Разрешить корень `Union` / `Intersect` / `Except` (UNION/UNION ALL/INTERSECT/
