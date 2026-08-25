@@ -90,6 +90,12 @@ export default function Chat() {
     pendingRef.current = pending;
   }, [pending]);
 
+  // Помечаем страницу для стилизации скроллбара чата (убираем при уходе).
+  useEffect(() => {
+    document.body.classList.add("chat-page");
+    return () => document.body.classList.remove("chat-page");
+  }, []);
+
   // Автопрокрутка к последнему сообщению.
   useEffect(() => {
     if (scrollRef.current) {

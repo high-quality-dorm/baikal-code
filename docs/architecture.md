@@ -103,6 +103,7 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 - хранилище учёток — `UserCredentialsStore` (протокол); сейчас подключён мок
   `InMemoryAuthStore`, реальное хранилище через `db_mcp` — отдельный будущий этап.
 
+
 **Конвейер text-to-SQL и REST-слой**:
 - `app/gateway/client.py` — MCP-клиент к шлюзу `db_mcp` (stdio): `get_schema(role)`,
   `execute_query(sql, role, user_id=users.id)`. Сессия MCP поднимается лениво при

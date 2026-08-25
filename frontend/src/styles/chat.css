@@ -1,7 +1,8 @@
 /* ---------- Чат ---------- */
 
 .chat {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--color-chat-bg);
@@ -117,19 +118,20 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  overflow-y: auto;
 }
 
 /* Пустое состояние */
 
 .chat__empty {
-  flex: 1;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 20px;
-  padding: 48px 20px;
+  gap: 16px;
+  padding: 24px 20px;
 }
 
 .chat__empty-mark {
@@ -519,6 +521,74 @@
 
 .chat__scroll-anchor {
   height: 1px;
+}
+
+/* ---------- Стилизованный скроллбар чата (тема «вода») ---------- */
+
+body.chat-page {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Документная вертикальная прокрутка (webkit/Chromium) */
+body.chat-page::-webkit-scrollbar {
+  width: 12px;
+}
+
+body.chat-page::-webkit-scrollbar-track {
+  background: var(--color-chat-bg);
+}
+
+body.chat-page::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--color-primary),
+    var(--color-secondary)
+  );
+  opacity: 0.7;
+  border-radius: 999px;
+  border: 3px solid var(--color-chat-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+body.chat-page::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    var(--color-primary-hover),
+    var(--color-primary)
+  );
+}
+
+/* Внутренние прокручиваемые области (список сообщений, блок SQL) */
+.chat__messages,
+.sql-block__code {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.chat__messages::-webkit-scrollbar,
+.sql-block__code::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.chat__messages::-webkit-scrollbar-track,
+.sql-block__code::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat__messages::-webkit-scrollbar-thumb,
+.sql-block__code::-webkit-scrollbar-thumb {
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.chat__messages::-webkit-scrollbar-thumb:hover,
+.sql-block__code::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+  background-clip: padding-box;
 }
 
 @media (max-width: 640px) {

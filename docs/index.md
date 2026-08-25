@@ -11,6 +11,7 @@
 | Требования: кто что может видеть, PII-политика            | [roles.md](roles.md)                |
 | Как устроена система, поток запроса, модель безопасности  | [architecture.md](architecture.md)  |
 | Дизайн веб-интерфейса: токены, страницы, гостевой доступ  | [design.md](design.md)              |
+| Дизайн веб-интерфейса: токены, страницы, гостевой доступ  | [design.md](design.md)              |
 | Почему приняты те или иные решения (ADR)                   | [decisions.md](decisions.md)        |
 | Что сделано и что дальше, этапы работы                     | [roadmap.md](roadmap.md)            |
 | Параметры синтетических данных, демо-пользователи, RLS-проверки | [seed.md](seed.md)             |
@@ -45,6 +46,7 @@
 | Роли и права (app_ro/app_admin/app_audit, PII-колонки) | `db/02_roles.sql`                            |
 | Row-Level Security (students, academic_records)       | `db/03_rls.sql`                              |
 | Генератор синтетики                                   | `scripts/seed.py`                            |
+| Веб-интерфейс (React SPA: лендинг/чат/вход, токены, mock-ассистент) | `frontend/`                       |
 | Веб-интерфейс (React SPA: лендинг/чат/вход, токены, mock-ассистент) | `frontend/`                       |
 | Docker-контейнер БД (postgres:16-alpine)              | `docker-compose.yml`                         |
 | Команды (sync/run/db/seed/format/check/test)          | `Makefile`                                   |
