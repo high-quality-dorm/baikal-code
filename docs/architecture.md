@@ -39,10 +39,11 @@ PostgreSQL (roles + column-masking + RLS)
   (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
   создание пула сериализуется локом (гонка исключена); в транзакции ставится
   `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT;
-- `validate.py` — валидация SQL (sqlglot): ровно один read-only SELECT,
-  запрет опасных функций (включая nextval/pg_advisory_*), запрет DML в любом
-  узле дерева (WITH-выражения), запрет FOR UPDATE/FOR SHARE, гарантированный
-  лимит строк (`MAX_ROWS = 200`);
+- `validate.py` — валидация SQL (sqlglot): ровно один read-only запрос —
+  SELECT или set-операция (UNION/INTERSECT/EXCEPT), запрет опасных функций
+  (включая nextval/pg_advisory_*), запрет DML в любом узле дерева
+  (WITH-выражения), запрет FOR UPDATE/FOR SHARE и SELECT INTO по всему дереву,
+  гарантированный лимит строк (`MAX_ROWS = 200`);
 - `schema.py` — маскированное описание схемы для LLM из живого каталога БД
   (PII-колонки скрываются на уровне прав роли) + русские описания таблиц;
 - `audit.py` — запись запросов в `query_log` через выделенную роль `app_audit`;

@@ -12,9 +12,9 @@ PostgreSQL напрямую — только через этот пакет, г�
   RLS-контекста (`app.role` / `app.user_id`) в начале транзакции; создание
   пула сериализуется локом; в транзакции ставится `statement_timeout`
   (10 с по умолчанию).
-- `validate.py` — валидация SQL (sqlglot): только один read-only SELECT,
-  запрет опасных функций, DML в любом узле дерева, FOR UPDATE/FOR SHARE,
-  лимит строк (`MAX_ROWS = 200`).
+- `validate.py` — валидация SQL (sqlglot): только один read-only запрос
+  (SELECT или UNION/INTERSECT/EXCEPT), запрет опасных функций, DML в любом
+  узле дерева, FOR UPDATE/FOR SHARE, лимит строк (`MAX_ROWS = 200`).
 - `schema.py` — маскированное описание схемы для LLM из каталога БД + русские
   описания таблиц и колонок.
 - `audit.py` — запись запросов в `query_log` через роль `app_audit`.

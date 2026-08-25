@@ -3,7 +3,8 @@
 Гарантирует, что шлюз исполняет только безопасные read-only запросы:
 
 - ровно одно выражение (без мультистейтментов);
-- корень выражения — только SELECT (DDL/DML/COPY/SET и прочее отклоняется);
+- корень выражения — SELECT или set-операция (UNION/INTERSECT/EXCEPT);
+  DDL/DML/COPY/SET и прочее отклоняется;
 - запрет SELECT INTO;
 - запрет изменяющих операций в любом узле дерева (DML в WITH/подзапросах);
 - запрет клаузы блокировки строк (FOR UPDATE / FOR SHARE);
@@ -119,8 +120,12 @@ def _func_name(node: exp.Func) -> str | None:
     return node.sql_name()
 
 
-def _existing_limit(tree: exp.Select) -> int | None:
-    """Числовое значение LIMIT, если оно задано простым литералом."""
+def _existing_limit(tree: exp.Expression) -> int | None:
+    """Числовое значение LIMIT, если оно задано простым литералом.
+
+    Работает и для SELECT, и для set-операций (UNION/INTERSECT/EXCEPT):
+    у корневого узла LIMIT хранится в `args["limit"]`.
+    """
     limit = tree.args.get("limit")
     if limit is None:
         return None
@@ -162,11 +167,26 @@ def _check_no_locks(tree: exp.Expression) -> None:
             raise ValidationError("FOR UPDATE / FOR SHARE запрещены")
 
 
+def _check_no_into(tree: exp.Expression) -> None:
+    """Отклонить SELECT INTO в любом узле.
+
+    У set-операций `SELECT * INTO t FROM a UNION SELECT * FROM b` клауза INTO
+    лежит на первом операнде (Select), поэтому проверяем по всему дереву,
+    а не только на корне.
+    """
+    for node in tree.walk():
+        if isinstance(node, exp.Select) and node.args.get("into") is not None:
+            raise ValidationError("SELECT INTO запрещён")
+
+
 def validate(sql: str) -> ValidatedQuery:
     """Проверить SQL и вернуть нормализованный безопасный запрос.
 
+    Допустим единственный read-only запрос: SELECT или set-операция
+    (UNION/INTERSECT/EXCEPT). Верхний LIMIT зажимается до MAX_ROWS.
+
     Raises:
-        ValidationError: если SQL не является единственным read-only SELECT.
+        ValidationError: если SQL не является read-only запросом.
     """
     if not sql or not sql.strip():
         raise ValidationError("SQL не должен быть пустым")
@@ -186,10 +206,11 @@ def validate(sql: str) -> ValidatedQuery:
         raise ValidationError("Разрешён только один SQL-запрос")
 
     tree = statements[0]
-    if not isinstance(tree, exp.Select):
-        raise ValidationError("Разрешены только SELECT-запросы")
-    if tree.args.get("into") is not None:
-        raise ValidationError("SELECT INTO запрещён")
+    if not isinstance(tree, (exp.Select, exp.SetOperation)):
+        raise ValidationError(
+            "Разрешены только read-only запросы (SELECT, UNION/INTERSECT/EXCEPT)"
+        )
+    _check_no_into(tree)
     _check_read_only_tree(tree)
     _check_no_locks(tree)
     _check_forbidden_functions(tree)
