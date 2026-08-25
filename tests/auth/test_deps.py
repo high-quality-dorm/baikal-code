@@ -2,6 +2,8 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 import pytest
 
+from db_mcp.roles import BusinessRole
+
 from app.auth.deps import AuthContext, get_current_user, require_role
 from app.core.security import create_access_token
 
@@ -26,13 +28,13 @@ def test_get_current_user_missing_header():
 
 
 def test_require_role_allows():
-    dep = require_role("admin")
+    dep = require_role(BusinessRole.ADMIN)
     ctx = get_current_user(make_credentials(role="admin"))
     assert dep(ctx) is None
 
 
 def test_require_role_denies():
-    dep = require_role("admin")
+    dep = require_role(BusinessRole.ADMIN)
     ctx = get_current_user(make_credentials(role="student"))
     with pytest.raises(HTTPException) as ei:
         dep(ctx)

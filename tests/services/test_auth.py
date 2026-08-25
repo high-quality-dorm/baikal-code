@@ -1,7 +1,8 @@
 import pytest
 
+from db_mcp.roles import BusinessRole
+
 from app.auth.schemas import Credentials, UserCreate, UserUpdate
-from app.api.schemas import Role
 from app.core.security import hash_password, decode_access_token
 from app.services.auth import (
     AdminExistsError,
@@ -60,7 +61,7 @@ async def test_authenticate_unknown_login():
 async def test_bootstrap_admin_creates_when_empty():
     svc = make_service()
     out = await svc.bootstrap_admin("admin@x.ru", "admin12345")
-    assert out.role == Role.ADMIN.value
+    assert out.role == BusinessRole.ADMIN.value
 
 
 @pytest.mark.anyio
@@ -80,7 +81,7 @@ async def test_create_user_duplicate():
         id=None, external_id="e1", email="a@b.c",
         password_hash=hash_password("pw123456"), role="student", is_active=True))
     with pytest.raises(DuplicateLoginError):
-        await svc.create_user(UserCreate(email="a@b.c", password="pw123456", role=Role.STUDENT))
+        await svc.create_user(UserCreate(email="a@b.c", password="pw123456", role=BusinessRole.STUDENT))
 
 
 @pytest.mark.anyio
@@ -91,7 +92,7 @@ async def test_create_user_duplicate_external_id():
         password_hash=hash_password("pw123456"), role="student", is_active=True))
     with pytest.raises(DuplicateLoginError):
         await svc.create_user(UserCreate(
-            email="other@b.c", password="pw123456", role=Role.STUDENT, external_id="e1"))
+            email="other@b.c", password="pw123456", role=BusinessRole.STUDENT, external_id="e1"))
 
 
 @pytest.mark.anyio

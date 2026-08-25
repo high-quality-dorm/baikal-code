@@ -2,22 +2,14 @@
 
 Роль и идентификатор пользователя передаются заголовками (X-Role, X-User-Id)
 и обрабатываются в auth; здесь — только типы тел запроса/ответа.
+
+Роли берутся из канонического вокабуляра db_mcp (`BusinessRole`), а не из
+собственного enum: приложение переиспользует единый источник значений.
 """
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, Field
-
-
-class Role(str, Enum):
-    """Роль пользователя в системе."""
-
-    APPLICANT = "applicant"  # абитуриент
-    STUDENT = "student"  # студент
-    TEACHER = "teacher"  # преподаватель
-    ADMIN = "admin"  # ректор, декан, сотрудники и администрация
 
 
 class Question(BaseModel):

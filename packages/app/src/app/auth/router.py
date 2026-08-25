@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from db_mcp.roles import BusinessRole
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.deps import AuthContext, get_current_user, require_role
@@ -53,7 +54,7 @@ async def bootstrap_admin(data: LoginRequest, service: ServiceDep):
     "/users",
     response_model=UserOut,
     status_code=201,
-    dependencies=[Depends(require_role("admin"))],
+    dependencies=[Depends(require_role(BusinessRole.ADMIN))],
 )
 async def create_user(data: UserCreate, service: ServiceDep):
     try:
@@ -65,7 +66,7 @@ async def create_user(data: UserCreate, service: ServiceDep):
 @router.get(
     "/users",
     response_model=list[UserOut],
-    dependencies=[Depends(require_role("admin"))],
+    dependencies=[Depends(require_role(BusinessRole.ADMIN))],
 )
 async def list_users(service: ServiceDep):
     return await service.list_users()
@@ -83,7 +84,7 @@ async def my_user(ctx: CurrentUser, service: ServiceDep):
 @router.patch(
     "/users/{user_id}",
     response_model=UserOut,
-    dependencies=[Depends(require_role("admin"))],
+    dependencies=[Depends(require_role(BusinessRole.ADMIN))],
 )
 async def update_user(user_id: int, data: UserUpdate, service: ServiceDep):
     user = await service.update_user(user_id, data)
@@ -93,7 +94,9 @@ async def update_user(user_id: int, data: UserUpdate, service: ServiceDep):
 
 
 @router.delete(
-    "/users/{user_id}", status_code=204, dependencies=[Depends(require_role("admin"))]
+    "/users/{user_id}",
+    status_code=204,
+    dependencies=[Depends(require_role(BusinessRole.ADMIN))],
 )
 async def deactivate_user(user_id: int, service: ServiceDep):
     ok = await service.deactivate_user(user_id)

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from db_mcp.roles import BusinessRole
 from pydantic import BaseModel, Field
-
-from app.api.schemas import Role
 
 
 class LoginRequest(BaseModel):
@@ -40,7 +39,7 @@ class UserCreate(BaseModel):
 
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
-    role: Role
+    role: BusinessRole
     external_id: str | None = Field(default=None, max_length=100)
     display_name: str | None = Field(default=None, max_length=150)
 
@@ -48,7 +47,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """Обновление учётки админом (все поля необязательны)."""
 
-    role: Role | None = None
+    role: BusinessRole | None = None
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=8, max_length=128)
     display_name: str | None = Field(default=None, max_length=150)

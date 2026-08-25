@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from db_mcp.roles import BusinessRole
+
 from app.auth.schemas import (
     Credentials,
     TokenResponse,
@@ -67,10 +69,10 @@ class AuthService:
     async def bootstrap_admin(self, email: str, password: str) -> UserOut:
         """Создаёт первого админа, только если админов ещё нет."""
         all_users = await self.list_users()
-        if any(u.role == "admin" for u in all_users):
+        if any(u.role == BusinessRole.ADMIN.value for u in all_users):
             raise AdminExistsError("Админ уже существует")
         return await self.create_user(
-            UserCreate(email=email, password=password, role="admin")
+            UserCreate(email=email, password=password, role=BusinessRole.ADMIN)
         )
 
     async def create_user(self, data: UserCreate) -> UserOut:

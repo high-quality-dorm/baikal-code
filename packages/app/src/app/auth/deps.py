@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
+from db_mcp.roles import BusinessRole
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -58,15 +59,17 @@ def get_optional_context(
         return AuthContext()
 
 
-def require_role(*roles: str) -> Callable[..., None]:
+def require_role(*roles: BusinessRole) -> Callable[..., None]:
     """Возвращает зависимость, требующую одну из указанных ролей (иначе 403).
 
     Текущий пользователь берётся из Bearer-токена через get_current_user,
     поэтому require_role можно передавать напрямую в Depends.
     """
 
+    allowed = {role.value for role in roles}
+
     def checker(ctx: Annotated[AuthContext, Depends(get_current_user)]) -> None:
-        if not ctx.role or ctx.role not in roles:
+        if not ctx.role or ctx.role not in allowed:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
     return checker
