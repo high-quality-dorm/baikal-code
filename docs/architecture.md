@@ -67,9 +67,11 @@ PostgreSQL (roles + column-masking + RLS)
 PII-колонок для маскирования описания схемы — в `schema.py` (`SENSITIVE_COLUMNS`).
 
 ### packages/app
-FastAPI-приложение: сам конвейер text-to-SQL поверх `db_mcp`.
-**API-схемы** — в `packages/app/src/app/api/schemas.py`: `Role`
-(applicant/student/teacher/admin), `Question`, `Answer`, `QueryMeta`.
+FastAPI-приложение: сам конвейер text-to-SQL поверх `db_mcp`. Пакет зависит от
+`db-mcp` (workspace) и переиспользует его канонический вокабуляр ролей
+`BusinessRole` вместо собственного enum.
+**API-схемы** — в `packages/app/src/app/api/schemas.py`:
+`Question`, `Answer`, `QueryMeta`.
 
 **Auth-подсистема** (`packages/app/src/app/auth/` + `core/security.py` + `services/`):
 - вход по логину/паролю → JWT access-токен (RS256), подписанный RSA-ключом;

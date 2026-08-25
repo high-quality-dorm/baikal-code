@@ -5,7 +5,9 @@
 
 Значения ролей (`applicant` / `student` / `teacher` / `admin`) — контракт для
 JWT, таблицы `users` и RLS-контекста. Канонический список — enum `BusinessRole`
-в `packages/db_mcp/src/db_mcp/roles.py`.
+в `packages/db_mcp/src/db_mcp/roles.py`. Приложение (`packages/app`) и сид
+(`scripts/seed.py`) используют `BusinessRole` как единый источник значений —
+собственный enum `Role` в app отсутствует.
 
 ## Разграничение доступа и персональные данные
 
