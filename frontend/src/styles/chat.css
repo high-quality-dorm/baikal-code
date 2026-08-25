@@ -1,7 +1,8 @@
 /* ---------- Чат ---------- */
 
 .chat {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--color-chat-bg);
@@ -117,19 +118,20 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  overflow-y: auto;
 }
 
 /* Пустое состояние */
 
 .chat__empty {
-  flex: 1;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 20px;
-  padding: 48px 20px;
+  gap: 16px;
+  padding: 24px 20px;
 }
 
 .chat__empty-mark {
