@@ -57,8 +57,8 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 (applicant/student/teacher/admin), `Question`, `Answer`, `QueryMeta`.
 
 **Auth-подсистема** (`packages/app/src/app/auth/` + `core/security.py` + `services/`):
-- вход по логину/паролю → JWT access-токен (HS256), роль и internal_id берутся из
-  токена; пароли хэшируются bcrypt;
+- вход по логину/паролю → JWT access-токен (RS256), подписанный RSA-ключом;
+  роль и идентификатор учётки (`sub`) берутся из токена; пароли хэшируются bcrypt;
 - эндпоинты `/api/v1/auth/login` и `/api/v1/auth/bootstrap-admin` (создание первого
   админа, только если админов ещё нет);
 - администратор управляет учётными записями: `POST/GET/PATCH/DELETE /api/v1/auth/users`;

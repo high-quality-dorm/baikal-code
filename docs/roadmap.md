@@ -14,18 +14,34 @@
 | 2 | Модели | Доменные сущности БД → `db_mcp/models.py`; API-схемы → `app/api/schemas.py` | `37318c8` |
 | 3 | БД в docker | PostgreSQL 16 (docker-compose); схема (17 таблиц), роли, RLS; верифицирована матрица RLS | `6968339` |
 | 4 | Сид | Генератор синтетики `scripts/seed.py` (faker, детерминированный); RLS проверен на данных | `5a64992` |
-| 5 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
-
 | 5 | Ядро db_mcp | Модули шлюза `access`/`validate`/`schema`/`audit`; MCP-сервер (mcp 2.0, `get_schema`/`execute_query`); валидация sqlglot; аудит в `query_log`; тесты | `c80b1cc` |
+| 6 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
 
 ## Что дальше
 
-### Запланированные этапы: укрепление шлюза db_mcp
-
-Отдельные логические этапы улучшения `db_mcp`. Каждый — реализация →
+Запланированные этапы улучшения `db_mcp` и приложения. Каждый — реализация →
 `make check` → коммит → объяснение пользователю → подтверждение на следующий.
 
-#### Этап A. Устойчивость и валидация (критичные)
+### Этап E. Унификация маппингов ролей
+- Новый модуль `db_mcp/roles.py`: канонический вокабуляр ролей —
+  `BusinessRole(str, Enum)` (applicant/student/teacher/admin) и `DbPool(Enum)`
+  (ro/admin/audit). Единый источник вместо констант в `access.py` и enum
+  `Role` в `app/api/schemas.py`.
+- `access.py`: единый словарь `_BUSINESS_ROLE_TO_POOL: dict[BusinessRole, DbPool]`;
+  `BUSINESS_ROLES` выводится из `BusinessRole`; один метод `Pools.pool(db_pool)`
+  и `Settings.dsn_for(db_pool)`; `pool_for_role` нормализует `BusinessRole(role)`;
+  удалить строковые ключи «ro/admin» и ветку `key == "admin"`.
+- `app`: зависимость `db-mcp` в `pyproject.toml`; удалить `Role` из
+  `api/schemas.py`; везде `BusinessRole`; `require_role(*BusinessRole)`;
+  правки `auth/schemas.py`, `services/auth.py`.
+- `scripts/seed.py`: демо-роли через `BusinessRole`.
+- `db/03_rls.sql`: строки ролей остаются (SQL); добавляется тест согласованности:
+  литералы ролей в RLS и сиде ⊆ значений `BusinessRole`.
+- Тесты: `test_access.py` (enum-маппинг, `UnknownRoleError`), новый `test_roles.py`.
+- Docs: `architecture.md` (единый источник ролей), `decisions.md` (новый ADR),
+  `roles.md` (справочник → `BusinessRole`).
+
+### Этап A. Устойчивость и валидация (критичные)
 - `statement_timeout` (10 с по умолчанию, настройка в `Settings`) в начале
   транзакции `connection_for` — защита от «зависших» SELECT (сейчас тяжёлый
   запрос может держать соединение пула вечно).
@@ -42,7 +58,7 @@
 - Регресс-тесты `validate`; обновление `docs/architecture.md`,
   `docs/decisions.md` (ADR 13 + новый ADR про timeout).
 
-#### Этап B. Поддержка set-операций
+### Этап B. Поддержка set-операций
 - Разрешить корень `Union` / `Intersect` / `Except` (UNION/UNION ALL/INTERSECT/
   EXCEPT) с зажимом верхнего `LIMIT MAX_ROWS`; проверки `into`/locks/DML-дерева
   сохраняются.
@@ -50,7 +66,7 @@
   отклоняется.
 - Обновление `docs/architecture.md` и `docs/decisions.md`.
 
-#### Этап C. Корректность ответа `execute_query`
+### Этап C. Корректность ответа `execute_query`
 - Новый формат ответа: `columns` + `rows` (массив массивов). Колонки берутся из
   `record.keys()` — порядок и дубли сохраняются. Сейчас `dict(record)` молча
   теряет колонки при `SELECT *` из JOIN с одинаковыми именами.
@@ -59,7 +75,7 @@
   перед парсингом, иначе sqlglot падает с ложной ошибкой.
 - Тесты; обновление `packages/db_mcp/README.md` и `docs/architecture.md`.
 
-#### Этап D. Схема для LLM: PK/FK и кэш
+### Этап D. Схема для LLM: PK/FK и кэш
 - В описание схемы (`schema.py`) добавить первичные и внешние ключи из
   `information_schema` (с учётом `EXCLUDED_TABLES` и маскирования PII под роль):
   `primary_key` и `foreign_keys` для каждой таблицы — улучшение генерации JOIN.
@@ -69,40 +85,23 @@
   выводе, кэш.
 - Обновление `docs/architecture.md` и `docs/decisions.md`.
 
-| 6 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
-
-## Что дальше
-
-### Следующий этап: ядро db_mcp
-- Модули шлюза: `access`, `validate`, `schema`, `audit`.
-- FastMCP-сервер (`db_mcp/server.py`, точка входа `db-mcp` уже объявлена в
-  `packages/db_mcp/pyproject.toml`).
-- После ядра — реальное хранилище учёток `UserCredentialsStore` на основе `db_mcp`
-  (сейчас auth работает на in-memory моке).
-<<<<<<< HEAD
-
-=======
->>>>>>> ef0fbba (docs(auth): update decisions, architecture, and roadmap for JWT auth)
-
 ### После: приложение (packages/app)
 - Конвейер text-to-SQL: генерация SQL через LLM (LangChain), валидация,
   ролевое маскирование схемы, вызов шлюза через MCP, форматирование ответа.
 - REST-эндпоинты FastAPI поверх этого.
+- Реальное хранилище учёток `UserCredentialsStore` на основе `db_mcp`
+  (сейчас auth работает на in-memory моке).
 
 ## Текущее состояние
 
 - База заполнена синтетикой (см. [seed.md](seed.md)).
 - RLS работает: студент видит только своё, преподаватель — только свои курсы,
   администрация — всё (включая PII).
-<<<<<<< HEAD
 - Шлюз `db_mcp` работает как MCP-сервер на stdio: валидация SQL, исполнение
   с RLS-контекстом, маскирование схемы под роль, аудит в `query_log`
   (запросы — только SELECT, лимит строк 200).
-=======
->>>>>>> ef0fbba (docs(auth): update decisions, architecture, and roadmap for JWT auth)
-- Auth реализован (JWT по логину/паролю, управление учётками), но хранилище учёток
-  пока in-memory — подключение к `db_mcp` впереди.
-- Следующий шаг перед новым этапом — уточнить у пользователя план модулей `db_mcp`.
+- Auth реализован (JWT по логину/паролю, управление учётками), но хранилище
+  учёток пока in-memory — подключение к `db_mcp` впереди.
 
 ## Открытые блокеры
 
