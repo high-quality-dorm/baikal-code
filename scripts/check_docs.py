@@ -5,6 +5,8 @@
 1. Ровно один README.md — в docs/, в корне репозитория README нет.
 2. Все относительные ссылки в .md-файлах указывают на существующие файлы.
 3. docs/index.md покрывает все файлы docs/ (каждый документ упомянут в индексе).
+4. Ни один .md-файл не содержит маркеров незавершённого слияния
+   (<<<<<<< / ======= / >>>>>>>).
 
 Точка входа: `make docs-check` или `uv run python scripts/check_docs.py`.
 При любых проблемах печатает список и завершается с ненулевым кодом.
@@ -24,6 +26,8 @@ README = "README.md"
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 # Исключаем внешние и якорные ссылки
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "#", "ftp://")
+# Маркеры незавершённого слияния (git conflict markers)
+CONFLICT_RE = re.compile(r"^(<<<<<<< |=======$|>>>>>>> )", re.MULTILINE)
 
 
 def _md_files() -> list[Path]:
@@ -93,8 +97,20 @@ def check_index_covers_docs() -> list[str]:
     return errors
 
 
+def check_conflicts() -> list[str]:
+    """Ни один markdown-файл не должен содержать маркеров незавершённого слияния."""
+    errors: list[str] = []
+    for md in _md_files():
+        text = md.read_text(encoding="utf-8")
+        matches = list(CONFLICT_RE.finditer(text))
+        if matches:
+            lines = ", ".join(str(1 + text.count("\n", 0, m.start())) for m in matches[:5])
+            errors.append(f"{md.relative_to(ROOT)}: маркеры незавершённого слияния на строках {lines}")
+    return errors
+
+
 def main() -> None:
-    checks = [check_links, check_single_readme, check_index_covers_docs]
+    checks = [check_links, check_single_readme, check_index_covers_docs, check_conflicts]
     errors: list[str] = []
     for check in checks:
         errors.extend(check())
@@ -105,7 +121,8 @@ def main() -> None:
             print(f"  - {err}")
         sys.exit(1)
     print(
-        "Документация в порядке: ссылки валидны, README один, индекс покрывает все файлы."
+        "Документация в порядке: ссылки валидны, README один, индекс покрывает все файлы, "
+        "маркеров слияния нет."
     )
 
 
