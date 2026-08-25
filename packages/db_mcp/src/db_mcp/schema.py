@@ -10,7 +10,8 @@
   помечаются флагом `sensitive`, чтобы LLM не выводил их в ответах.
 
 К каталогу добавляются русские описания таблиц и колонок (для генерации
-корректного SQL) и пометка PII-колонок.
+корректного SQL), пометка PII-колонок, а также статические PK/FK из TABLE_META
+(для генерации JOIN).
 """
 
 from __future__ import annotations
@@ -23,12 +24,28 @@ import asyncpg
 from db_mcp.access import Pools
 
 
+class _ForeignKey(TypedDict):
+    """Внешний ключ: колонка таблицы и её цель."""
+
+    column: str
+    references_table: str
+    references_column: str
+
+
 class _TableMeta(TypedDict):
-    """Русские описания таблицы: заголовок, описание и описания колонок."""
+    """Статическое описание таблицы: заголовок, колонки и ключи.
+
+    PK/FK хранятся здесь (а не читаются из каталога): информация о схеме и
+    так хардкодится в TABLE_META, а из БД остаётся брать только фактические
+    колонки (маскированные под роль). Содержимое ключей контролируется —
+    PII-колонки не могут оказаться PK или целью FK.
+    """
 
     title: str
     description: str
     columns: dict[str, str]
+    primary_key: list[str]
+    foreign_keys: list[_ForeignKey]
 
 
 # Служебные таблицы, которые не попадают в описание схемы для LLM
@@ -44,6 +61,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "faculties": {
         "title": "Факультеты",
         "description": "Факультеты университета.",
+        "primary_key": ["faculty_id"],
+        "foreign_keys": [
+            {
+                "column": "dean_id",
+                "references_table": "staff",
+                "references_column": "staff_id",
+            },
+        ],
         "columns": {
             "faculty_id": "Идентификатор факультета",
             "title": "Название факультета",
@@ -53,6 +78,19 @@ TABLE_META: dict[str, _TableMeta] = {
     "departments": {
         "title": "Кафедры",
         "description": "Кафедры, входящие в состав факультетов.",
+        "primary_key": ["department_id"],
+        "foreign_keys": [
+            {
+                "column": "faculty_id",
+                "references_table": "faculties",
+                "references_column": "faculty_id",
+            },
+            {
+                "column": "head_id",
+                "references_table": "staff",
+                "references_column": "staff_id",
+            },
+        ],
         "columns": {
             "department_id": "Идентификатор кафедры",
             "title": "Название кафедры",
@@ -63,6 +101,8 @@ TABLE_META: dict[str, _TableMeta] = {
     "roles": {
         "title": "Роли сотрудников",
         "description": "Справочник должностей сотрудников.",
+        "primary_key": ["id"],
+        "foreign_keys": [],
         "columns": {
             "id": "Идентификатор роли",
             "title": "Название роли",
@@ -71,6 +111,19 @@ TABLE_META: dict[str, _TableMeta] = {
     "staff": {
         "title": "Сотрудники и преподаватели",
         "description": "Сотрудники и преподаватели университета. ФИО выводимо.",
+        "primary_key": ["staff_id"],
+        "foreign_keys": [
+            {
+                "column": "role_id",
+                "references_table": "roles",
+                "references_column": "id",
+            },
+            {
+                "column": "department_id",
+                "references_table": "departments",
+                "references_column": "department_id",
+            },
+        ],
         "columns": {
             "staff_id": "Идентификатор сотрудника",
             "full_name": "ФИО сотрудника",
@@ -81,6 +134,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "specialties": {
         "title": "Направления подготовки",
         "description": "Направления подготовки (специальности).",
+        "primary_key": ["specialty_id"],
+        "foreign_keys": [
+            {
+                "column": "faculty_id",
+                "references_table": "faculties",
+                "references_column": "faculty_id",
+            },
+        ],
         "columns": {
             "specialty_id": "Идентификатор направления",
             "code": "Код направления (например, 09.03.01)",
@@ -92,6 +153,8 @@ TABLE_META: dict[str, _TableMeta] = {
     "student_statuses": {
         "title": "Статусы студентов",
         "description": "Справочник статусов студентов.",
+        "primary_key": ["status_id"],
+        "foreign_keys": [],
         "columns": {
             "status_id": "Идентификатор статуса",
             "title": "Название статуса (например, «обучается», «отчислен»)",
@@ -100,6 +163,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "groups": {
         "title": "Учебные группы",
         "description": "Учебные группы.",
+        "primary_key": ["group_id"],
+        "foreign_keys": [
+            {
+                "column": "specialty_id",
+                "references_table": "specialties",
+                "references_column": "specialty_id",
+            },
+        ],
         "columns": {
             "group_id": "Идентификатор группы",
             "title": "Название группы",
@@ -114,6 +185,24 @@ TABLE_META: dict[str, _TableMeta] = {
             "персональные данные: доступны только администрации и не должны "
             "попадать в ответы."
         ),
+        "primary_key": ["student_id"],
+        "foreign_keys": [
+            {
+                "column": "specialty_id",
+                "references_table": "specialties",
+                "references_column": "specialty_id",
+            },
+            {
+                "column": "group_id",
+                "references_table": "groups",
+                "references_column": "group_id",
+            },
+            {
+                "column": "status_id",
+                "references_table": "student_statuses",
+                "references_column": "status_id",
+            },
+        ],
         "columns": {
             "student_id": "Идентификатор студента",
             "name": "Имя (персональные данные)",
@@ -129,6 +218,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "courses": {
         "title": "Учебные дисциплины",
         "description": "Учебные дисциплины.",
+        "primary_key": ["course_id"],
+        "foreign_keys": [
+            {
+                "column": "department_id",
+                "references_table": "departments",
+                "references_column": "department_id",
+            },
+        ],
         "columns": {
             "course_id": "Идентификатор дисциплины",
             "title": "Название дисциплины",
@@ -140,6 +237,19 @@ TABLE_META: dict[str, _TableMeta] = {
     "course_instructors": {
         "title": "Назначение преподавателей на курсы",
         "description": "Связь преподавателей и дисциплин.",
+        "primary_key": ["course_id", "staff_id"],
+        "foreign_keys": [
+            {
+                "column": "course_id",
+                "references_table": "courses",
+                "references_column": "course_id",
+            },
+            {
+                "column": "staff_id",
+                "references_table": "staff",
+                "references_column": "staff_id",
+            },
+        ],
         "columns": {
             "course_id": "Дисциплина (courses.course_id)",
             "staff_id": "Преподаватель (staff.staff_id)",
@@ -148,6 +258,19 @@ TABLE_META: dict[str, _TableMeta] = {
     "academic_records": {
         "title": "Успеваемость студентов",
         "description": "Оценки студентов по дисциплинам.",
+        "primary_key": ["record_id"],
+        "foreign_keys": [
+            {
+                "column": "student_id",
+                "references_table": "students",
+                "references_column": "student_id",
+            },
+            {
+                "column": "course_id",
+                "references_table": "courses",
+                "references_column": "course_id",
+            },
+        ],
         "columns": {
             "record_id": "Идентификатор записи",
             "student_id": "Студент (students.student_id)",
@@ -160,6 +283,8 @@ TABLE_META: dict[str, _TableMeta] = {
     "rooms": {
         "title": "Аудитории",
         "description": "Аудиторный фонд.",
+        "primary_key": ["room_id"],
+        "foreign_keys": [],
         "columns": {
             "room_id": "Идентификатор аудитории",
             "building": "Корпус",
@@ -170,6 +295,24 @@ TABLE_META: dict[str, _TableMeta] = {
     "schedule_slots": {
         "title": "Расписание занятий",
         "description": "Расписание занятий.",
+        "primary_key": ["slot_id"],
+        "foreign_keys": [
+            {
+                "column": "course_id",
+                "references_table": "courses",
+                "references_column": "course_id",
+            },
+            {
+                "column": "group_id",
+                "references_table": "groups",
+                "references_column": "group_id",
+            },
+            {
+                "column": "room_id",
+                "references_table": "rooms",
+                "references_column": "room_id",
+            },
+        ],
         "columns": {
             "slot_id": "Идентификатор слота",
             "course_id": "Дисциплина (courses.course_id)",
@@ -182,6 +325,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "admission_plans": {
         "title": "Контрольные цифры приёма",
         "description": "Плановые показатели приёма по годам.",
+        "primary_key": ["plan_id"],
+        "foreign_keys": [
+            {
+                "column": "specialty_id",
+                "references_table": "specialties",
+                "references_column": "specialty_id",
+            },
+        ],
         "columns": {
             "plan_id": "Идентификатор плана",
             "year": "Год приёма",
@@ -194,6 +345,14 @@ TABLE_META: dict[str, _TableMeta] = {
     "admission_stats": {
         "title": "Статистика приёма",
         "description": "Фактическая статистика приёма по годам.",
+        "primary_key": ["stat_id"],
+        "foreign_keys": [
+            {
+                "column": "specialty_id",
+                "references_table": "specialties",
+                "references_column": "specialty_id",
+            },
+        ],
         "columns": {
             "stat_id": "Идентификатор записи",
             "year": "Год приёма",
@@ -259,6 +418,8 @@ class SchemaBuilder:
                     "name": table_name,
                     "title": meta["title"] if meta else None,
                     "description": meta["description"] if meta else None,
+                    "primary_key": meta["primary_key"] if meta else [],
+                    "foreign_keys": meta["foreign_keys"] if meta else [],
                     "columns": table_cols,
                 }
             )
