@@ -102,6 +102,31 @@ class Pools:
             self._pools.clear()
 
 
+async def resolve_internal_id(pools: Pools, user_id: str | int | None) -> str | None:
+    """Резолвит номер учётки (`users.id`) в доменный `internal_id` (str).
+
+    Выполняется через служебную роль `app_audit`, которая имеет право только на
+    колонки (id, internal_id) таблицы users — без password_hash/email и прочего.
+
+    Tolerant-поведение: пустой/нечисловой user_id, несуществующий users.id или
+    NULL internal_id возвращают None (без ошибки). В connection_for это даёт
+    app.user_id = NULL, что по RLS (deny-by-default) означает отсутствие строк
+    — безопасно, без исключений.
+    """
+    if user_id is None or (isinstance(user_id, str) and not user_id.strip()):
+        return None
+    try:
+        user_key = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    pool = await pools.audit()
+    async with pool.acquire() as conn:
+        internal_id = await conn.fetchval(
+            "SELECT internal_id FROM users WHERE id = $1", user_key
+        )
+    return str(internal_id) if internal_id is not None else None
+
+
 @asynccontextmanager
 async def connection_for(
     pools: Pools, role: str | BusinessRole, user_id: str
@@ -114,16 +139,34 @@ async def connection_for(
     не пропустят ни одной строки. Роль нормализуется в pool_for_role —
     неизвестная роль отклоняется до обращения к БД.
 
+    `user_id` — это **номер учётки** (`users.id`, он же `sub` из JWT), а не
+    доменный internal_id. Перед установкой контекста он резолвится в
+    internal_id (student_id/staff_id) через `resolve_internal_id` и служебную
+    роль `app_audit`. Для admin/applicant (internal_id может быть NULL) и для
+    несуществующего users.id `app.user_id` не ставится вовсе — настройка
+    отсутствует, `current_setting('app.user_id', true)` вернёт NULL, что по
+    RLS (deny-by-default) означает отсутствие строк. Такой вариант выбран,
+    потому что PostgreSQL хранит NULL в GUC как пустую строку "", а политика
+    преподавателя кастует `current_setting('app.user_id')` в int.
+
     Также в транзакции задаётся `statement_timeout` (is_local=true): тяжёлый
     запрос не может держать соединение пула дольше заданного лимита.
     """
     business_role = _as_business_role(role)
+    internal_id = await resolve_internal_id(pools, user_id)
     pool = await pools.pool_for_role(business_role)
     async with pool.acquire() as conn, conn.transaction():
         await conn.execute(
             "SELECT set_config('app.role', $1, true)", business_role.value
         )
-        await conn.execute("SELECT set_config('app.user_id', $1, true)", user_id)
+        # Если internal_id None, app.user_id НЕ ставим: PostgreSQL превращает
+        # NULL в GUC в пустую строку "", а политика преподавателя кастует
+        # current_setting('app.user_id') в int — это бы падало. Без установки
+        # настройки current_setting(..., true) вернёт NULL -> RLS deny-by-default.
+        if internal_id is not None:
+            await conn.execute(
+                "SELECT set_config('app.user_id', $1, true)", internal_id
+            )
         await conn.execute(
             "SELECT set_config('statement_timeout', $1, true)",
             str(pools.statement_timeout_ms),

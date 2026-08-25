@@ -82,6 +82,35 @@ async def _noop_record(**_: object) -> None:
     return None
 
 
+def test_execute_query_audits_user_id_as_users_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Аудит пишет номер учётки (users.id), а не резолвленный internal_id.
+
+    Резолюцию identity выполняет шлюз внутри connection_for; в query_log.user_id
+    должен попадать переданный users.id как есть.
+    """
+    import db_mcp.server as server_module
+
+    gateway = Gateway(Settings())
+    recorded: dict[str, object] = {}
+
+    async def fake_record(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    gateway._auditor.record = fake_record  # type: ignore[method-assign]
+
+    @asynccontextmanager
+    async def fake_connection_for(_pools: object, _role: object, _user_id: object):
+        yield _FakeConn([_FakeRecord(["student_id"], [7])])
+
+    monkeypatch.setattr(server_module, "connection_for", fake_connection_for)
+
+    asyncio.run(gateway.execute_query("SELECT 1", "student", "3"))
+    assert recorded["user_id"] == "3"
+    assert recorded["status"] == "ok"
+
+
 def test_execute_query_returns_columns_rows_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     """execute_query отдаёт columns/rows с сохранением дублей колонок."""
     import db_mcp.server as server_module

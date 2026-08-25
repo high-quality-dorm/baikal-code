@@ -7,11 +7,13 @@ import asyncio
 import asyncpg
 import pytest
 
+from db_mcp import access as access_module
 from db_mcp.access import (
     Pools,
     UnknownRoleError,
     _as_business_role,
     connection_for,
+    resolve_internal_id,
 )
 from db_mcp.roles import BUSINESS_ROLES, BusinessRole, DbPool
 from db_mcp.settings import Settings
@@ -73,6 +75,111 @@ def test_unknown_role_rejected_before_connecting() -> None:
 
 def test_statement_timeout_default() -> None:
     assert Settings().statement_timeout_ms == 10_000
+
+
+class _FakeValConn:
+    """Фейк соединения с fetchval (для тестов резолвера)."""
+
+    def __init__(self, result: object) -> None:
+        self._result = result
+        self.executed: list[tuple[str, tuple[object, ...]]] = []
+
+    async def fetchval(self, sql: str, *args: object) -> object:
+        self.executed.append((sql, args))
+        return self._result
+
+    async def __aenter__(self) -> "_FakeValConn":
+        return self
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+
+class _FakeAuditPool:
+    """Фейк пула аудита: acquire() отдаёт фейк-соединение с fetchval."""
+
+    def __init__(self, conn: _FakeValConn) -> None:
+        self.conn = conn
+
+    def acquire(self) -> _FakeValConn:
+        return self.conn
+
+
+def test_resolve_internal_id_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    pools = Pools(Settings())
+    fake_conn = _FakeValConn(7)
+    fake_pool = _FakeAuditPool(fake_conn)
+
+    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+        return fake_pool
+
+    monkeypatch.setattr(Pools, "audit", fake_audit)
+
+    async def run() -> str | None:
+        return await resolve_internal_id(pools, "3")
+
+    assert asyncio.run(run()) == "7"
+    assert fake_conn.executed[0][0].startswith("SELECT internal_id FROM users")
+
+
+def test_resolve_internal_id_null_internal_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """users.id существует, но internal_id = NULL -> None (без ошибки)."""
+    pools = Pools(Settings())
+    fake_conn = _FakeValConn(None)
+    fake_pool = _FakeAuditPool(fake_conn)
+
+    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+        return fake_pool
+
+    monkeypatch.setattr(Pools, "audit", fake_audit)
+
+    async def run() -> str | None:
+        return await resolve_internal_id(pools, "1")
+
+    assert asyncio.run(run()) is None
+
+
+@pytest.mark.parametrize("unknown", ["999999", "-5"])
+def test_resolve_internal_id_unknown_numeric_id_goes_to_db(
+    monkeypatch: pytest.MonkeyPatch, unknown: str
+) -> None:
+    """Числовой, но несуществующий users.id -> обращение к БД и None."""
+    pools = Pools(Settings())
+    fake_conn = _FakeValConn(None)
+    fake_pool = _FakeAuditPool(fake_conn)
+
+    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+        return fake_pool
+
+    monkeypatch.setattr(Pools, "audit", fake_audit)
+
+    async def run() -> str | None:
+        return await resolve_internal_id(pools, unknown)
+
+    assert asyncio.run(run()) is None
+    assert fake_conn.executed[0][1] == (int(unknown),)
+
+
+@pytest.mark.parametrize("bad", [None, "", "  ", "abc", "3.14"])
+def test_resolve_internal_id_tolerant_bad_input(
+    monkeypatch: pytest.MonkeyPatch, bad: object
+) -> None:
+    """Пустой/нечисловой user_id -> None без обращения к БД и без ошибки."""
+    pools = Pools(Settings())
+    called = False
+
+    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+        nonlocal called
+        called = True
+        return _FakeAuditPool(_FakeValConn(None))
+
+    monkeypatch.setattr(Pools, "audit", fake_audit)
+
+    async def run() -> str | None:
+        return await resolve_internal_id(pools, bad)  # type: ignore[arg-type]
+
+    assert asyncio.run(run()) is None
+    assert not called
 
 
 def test_pool_created_once_under_concurrency(
@@ -138,10 +245,14 @@ def test_connection_for_sets_rls_and_timeout(monkeypatch: pytest.MonkeyPatch) ->
     async def fake_pool_for_role(_self: Pools, _role: object) -> _FakePool:
         return fake_pool
 
+    async def fake_resolve(_self: Pools, _user_id: object) -> str:
+        return "42"
+
     monkeypatch.setattr(Pools, "pool_for_role", fake_pool_for_role)
+    monkeypatch.setattr(access_module, "resolve_internal_id", fake_resolve)
 
     async def run() -> None:
-        async with connection_for(pools, BusinessRole.STUDENT, "42"):
+        async with connection_for(pools, BusinessRole.STUDENT, "3"):
             pass
 
     asyncio.run(run())
@@ -153,6 +264,43 @@ def test_connection_for_sets_rls_and_timeout(monkeypatch: pytest.MonkeyPatch) ->
         "SELECT set_config('statement_timeout', $1, true)",
     ]
     role_args = fake_pool.conn.executed[0][1]
+    user_args = fake_pool.conn.executed[1][1]
     timeout_args = fake_pool.conn.executed[2][1]
     assert role_args == ("student",)
+    assert user_args == ("42",)  # резолвленный internal_id, а не users.id "3"
     assert timeout_args == (str(Settings().statement_timeout_ms),)
+
+
+def test_connection_for_null_internal_id_skips_user_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NULL internal_id (admin/applicant/несуществующий) -> app.user_id не ставится.
+
+    PostgreSQL хранит NULL в GUC как пустую строку, которая ломала бы политику
+    преподавателя (`current_setting(...)::int`). Поэтому настройка просто
+    отсутствует -> current_setting(..., true) даёт NULL -> RLS deny-by-default.
+    """
+    pools = Pools(Settings())
+    fake_pool = _FakePool()
+
+    async def fake_pool_for_role(_self: Pools, _role: object) -> _FakePool:
+        return fake_pool
+
+    async def fake_resolve(_self: Pools, _user_id: object) -> None:
+        return None
+
+    monkeypatch.setattr(Pools, "pool_for_role", fake_pool_for_role)
+    monkeypatch.setattr(access_module, "resolve_internal_id", fake_resolve)
+
+    async def run() -> None:
+        async with connection_for(pools, BusinessRole.ADMIN, "1"):
+            pass
+
+    asyncio.run(run())
+
+    sqls = [sql for sql, _ in fake_pool.conn.executed]
+    assert sqls == [
+        "SELECT set_config('app.role', $1, true)",
+        "SELECT set_config('statement_timeout', $1, true)",
+    ]
+    assert not any("app.user_id" in sql for sql, _ in fake_pool.conn.executed)
