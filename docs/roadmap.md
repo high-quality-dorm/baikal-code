@@ -23,6 +23,7 @@
 | 11 | Схема для LLM (D) | PK/FK в описании схемы (статический `TABLE_META` — `primary_key`/`foreign_keys`) для генерации JOIN; тест-инвариант: PII-колонки не PK и не цели FK | `d899ea4` |
 | 12 | Роли в app и seed (E2) | app зависит от `db-mcp`; enum `Role` удалён, везде `BusinessRole`; `require_role(*BusinessRole)`; демо-роли сида через `BusinessRole` | `d2c69f8`, `ed67079` |
 | 13 | Резолюция identity | Грант `app_audit` на `users(id, internal_id)`; `resolve_internal_id` + `connection_for` (users.id → internal_id для RLS); аудит пишет `users.id`; контракт MCP-инструмента обновлён | `f88d2f1`, `1fed9d4`, `60a0eaf` |
+| 14 | internal_id в учётках | `UserCreate.internal_id` (ge=1); `create_user` пробрасывает его в `Credentials`; bootstrap-админ → None; контракт JWT `sub` = users.id не меняется | `82c082f` |
 
 ## Что дальше
 
@@ -55,14 +56,15 @@
 staff_id). JWT `sub` остаётся номером учётки (`users.id`) — контракт токена не
 меняется; резолюцию выполняет шлюз (этап 13).
 
-- [ ] **Шаг 14.1** `UserCreate.internal_id: int | None` (админ задаёт вручную).
-- [ ] **Шаг 14.2** `AuthService.create_user` пробрасывает `internal_id` в
+- [x] **Шаг 14.1** `UserCreate.internal_id: int | None` (админ задаёт вручную,
+      `ge=1`).
+- [x] **Шаг 14.2** `AuthService.create_user` пробрасывает `internal_id` в
       `Credentials`; bootstrap-админ → `internal_id=None`.
-- [ ] **Шаг 14.3** Роутер `POST /auth/users` принимает `internal_id`. Проверки
+- [x] **Шаг 14.3** Роутер `POST /auth/users` принимает `internal_id`. Проверки
       существования студента/преподавателя нет — неверный ID даёт пустой RLS.
-- [ ] **Шаг 14.4** Тесты создания учётки с `internal_id`; обновить
+- [x] **Шаг 14.4** Тесты создания учётки с `internal_id`; обновить
       `test_api`, `test_auth`; обновить `docs/roles.md`, `docs/architecture.md`.
-- [ ] `make check`, `make test` → коммит → стоп → объяснение.
+- [x] `make check`, `make test` → коммит → стоп → объяснение.
 
 ### Этап 15 — Конвейер text-to-SQL + POST /api/v1/ask (packages/app)
 Цель: полноценный `/ask`: схема под роль → LLM генерирует SQL → шлюз исполняет
