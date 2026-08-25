@@ -11,7 +11,7 @@ pytestmark = pytest.mark.usefixtures("rsa_keys")
 
 
 def make_client():
-    app = create_app()
+    app = create_app(auth_store=InMemoryAuthStore())
     return TestClient(app)
 
 

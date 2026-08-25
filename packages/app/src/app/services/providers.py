@@ -1,7 +1,9 @@
 """Хранилище учётных записей для auth-сервиса.
 
-Реальное хранилище будет получать данные через db_mcp (этап «ядро db_mcp»).
-Сейчас используется InMemoryAuthStore (мок) для разработки и тестов.
+Реальная реализация (DbUserCredentialsStore) читает/пишет таблицу `users`
+через шлюз db_mcp (MCP-инструмент manage_user) — приложение не ходит в базу
+напрямую. InMemoryAuthStore оставлен для unit-тестов auth, но в боевом коде
+не используется.
 """
 
 from __future__ import annotations
@@ -9,6 +11,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from app.auth.schemas import Credentials
+from app.gateway.client import GatewayClient
 
 
 class UserCredentialsStore(Protocol):
@@ -21,6 +24,68 @@ class UserCredentialsStore(Protocol):
     async def all(self) -> list[Credentials]: ...
 
     async def persist(self, user: Credentials) -> Credentials: ...
+
+
+def _to_credentials(data: dict | None) -> Credentials | None:
+    """Словарь из manage_user -> Credentials (None, если учётки нет)."""
+    if data is None:
+        return None
+    return Credentials(
+        id=data.get("id"),
+        external_id=data.get("external_id") or "",
+        email=data.get("email"),
+        password_hash=data.get("password_hash"),
+        role=data.get("role") or "",
+        internal_id=data.get("internal_id"),
+        display_name=data.get("display_name"),
+        is_active=bool(data.get("is_active", True)),
+    )
+
+
+class DbUserCredentialsStore:
+    """Реальное хранилище учёток поверх шлюза db_mcp (таблица users)."""
+
+    def __init__(self, gateway: GatewayClient) -> None:
+        self._gateway = gateway
+
+    async def get_credentials(self, login: str) -> Credentials | None:
+        data = await self._gateway.manage_user("get_credentials", login=login)
+        return _to_credentials(data)
+
+    async def find(self, user_id: int) -> Credentials | None:
+        data = await self._gateway.manage_user("find", user_id=user_id)
+        return _to_credentials(data)
+
+    async def all(self) -> list[Credentials]:
+        rows = await self._gateway.manage_user("list")
+        return [c for r in (rows or []) if (c := _to_credentials(r)) is not None]
+
+    async def persist(self, user: Credentials) -> Credentials:
+        if user.id is None:
+            data = await self._gateway.manage_user(
+                "create",
+                external_id=user.external_id,
+                email=user.email,
+                password_hash=user.password_hash,
+                role=user.role,
+                internal_id=user.internal_id,
+                display_name=user.display_name,
+            )
+        else:
+            data = await self._gateway.manage_user(
+                "update",
+                user_id=user.id,
+                email=user.email,
+                password_hash=user.password_hash,
+                role=user.role,
+                internal_id=user.internal_id,
+                display_name=user.display_name,
+                is_active=user.is_active,
+            )
+        result = _to_credentials(data)
+        if result is None:
+            raise ValueError("manage_user вернул None вместо учётной записи")
+        return result
 
 
 class InMemoryAuthStore:

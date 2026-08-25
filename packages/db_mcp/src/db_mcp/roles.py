@@ -25,7 +25,9 @@ class DbPool(Enum):
 
     RO = "ro"  # рабочая read-only роль app_ro (без PII)
     ADMIN = "admin"  # роль администрации app_admin (с PII)
-    AUDIT = "audit"  # роль аудита app_audit (запись в query_log)
+    SERVICE = (
+        "service"  # служебная роль app_service (аудит + auth + резолюция identity)
+    )
 
 
 # Значения бизнес-ролей: удобно для проверок «роль входит в набор»

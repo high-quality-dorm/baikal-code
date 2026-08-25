@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-university}
       APP_RO_PASSWORD: ${APP_RO_PASSWORD:-ro_secret}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-admin_secret}
-      APP_AUDIT_PASSWORD: ${APP_AUDIT_PASSWORD:-audit_secret}
+      APP_SERVICE_PASSWORD: ${APP_SERVICE_PASSWORD:-service_secret}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

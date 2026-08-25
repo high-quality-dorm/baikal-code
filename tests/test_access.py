@@ -95,8 +95,8 @@ class _FakeValConn:
         return False
 
 
-class _FakeAuditPool:
-    """Фейк пула аудита: acquire() отдаёт фейк-соединение с fetchval."""
+class _FakeServicePool:
+    """Фейк служебного пула: acquire() отдаёт фейк-соединение с fetchval."""
 
     def __init__(self, conn: _FakeValConn) -> None:
         self.conn = conn
@@ -108,12 +108,12 @@ class _FakeAuditPool:
 def test_resolve_internal_id_found(monkeypatch: pytest.MonkeyPatch) -> None:
     pools = Pools(Settings())
     fake_conn = _FakeValConn(7)
-    fake_pool = _FakeAuditPool(fake_conn)
+    fake_pool = _FakeServicePool(fake_conn)
 
-    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+    async def fake_service(_self: Pools) -> _FakeServicePool:
         return fake_pool
 
-    monkeypatch.setattr(Pools, "audit", fake_audit)
+    monkeypatch.setattr(Pools, "service", fake_service)
 
     async def run() -> str | None:
         return await resolve_internal_id(pools, "3")
@@ -126,12 +126,12 @@ def test_resolve_internal_id_null_internal_id(monkeypatch: pytest.MonkeyPatch) -
     """users.id существует, но internal_id = NULL -> None (без ошибки)."""
     pools = Pools(Settings())
     fake_conn = _FakeValConn(None)
-    fake_pool = _FakeAuditPool(fake_conn)
+    fake_pool = _FakeServicePool(fake_conn)
 
-    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+    async def fake_service(_self: Pools) -> _FakeServicePool:
         return fake_pool
 
-    monkeypatch.setattr(Pools, "audit", fake_audit)
+    monkeypatch.setattr(Pools, "service", fake_service)
 
     async def run() -> str | None:
         return await resolve_internal_id(pools, "1")
@@ -146,12 +146,12 @@ def test_resolve_internal_id_unknown_numeric_id_goes_to_db(
     """Числовой, но несуществующий users.id -> обращение к БД и None."""
     pools = Pools(Settings())
     fake_conn = _FakeValConn(None)
-    fake_pool = _FakeAuditPool(fake_conn)
+    fake_pool = _FakeServicePool(fake_conn)
 
-    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+    async def fake_service(_self: Pools) -> _FakeServicePool:
         return fake_pool
 
-    monkeypatch.setattr(Pools, "audit", fake_audit)
+    monkeypatch.setattr(Pools, "service", fake_service)
 
     async def run() -> str | None:
         return await resolve_internal_id(pools, unknown)
@@ -168,12 +168,12 @@ def test_resolve_internal_id_tolerant_bad_input(
     pools = Pools(Settings())
     called = False
 
-    async def fake_audit(_self: Pools) -> _FakeAuditPool:
+    async def fake_service(_self: Pools) -> _FakeServicePool:
         nonlocal called
         called = True
-        return _FakeAuditPool(_FakeValConn(None))
+        return _FakeServicePool(_FakeValConn(None))
 
-    monkeypatch.setattr(Pools, "audit", fake_audit)
+    monkeypatch.setattr(Pools, "service", fake_service)
 
     async def run() -> str | None:
         return await resolve_internal_id(pools, bad)  # type: ignore[arg-type]

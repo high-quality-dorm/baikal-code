@@ -73,12 +73,15 @@ JWT, таблицы `users` и RLS-контекста. Канонический 
 
 Разграничение бизнес-доступа (`app_ro` / `app_admin`) и его технические детали
 (колоночное сокрытие PII, RLS) описаны в [architecture.md](architecture.md).
-Здесь — примечание про `app_audit`:
+Здесь — примечание про `app_service`:
 
-- `app_audit` — служебная роль журналирования; пользователям недоступна.
-  Помимо записи в `query_log`, она выполняет резолюцию identity для шлюза и
-  потому имеет `SELECT (id, internal_id) ON users` (только эти две колонки,
-  не `password_hash`/`email`/`external_id` и т.п.). См. ADR 21 в
+- `app_service` — служебная роль приложения; пользователям недоступна.
+  Объединяет три служебные функции шлюза: запись в журнал аудита (`query_log`),
+  чтение/запись учётных записей для auth (`users`), и резолюцию identity для
+  RLS-контекста (`users.id` → `internal_id`). Поэтому имеет `SELECT, INSERT,
+  UPDATE ON users` и `SELECT, INSERT ON query_log`. `DELETE ON users` сознательно
+  не выдаётся: деактивация учётки мягкая (`is_active = FALSE`). На доменные
+  таблицы (students/staff и т.п.) прав не имеет. См. ADR 21 и ADR 27 в
   [decisions.md](decisions.md).
 
 ## Связь учётки и человека (internal_id)

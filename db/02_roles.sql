@@ -4,7 +4,7 @@
 -- Читаем пароли ролей из переменных окружения контейнера
 \getenv app_ro_pw APP_RO_PASSWORD
 \getenv app_admin_pw APP_ADMIN_PASSWORD
-\getenv app_audit_pw APP_AUDIT_PASSWORD
+\getenv app_service_pw APP_SERVICE_PASSWORD
 
 -- Рабочая read-only роль: SELECT на все таблицы, НО без прав на PII-колонки студентов
 CREATE ROLE app_ro LOGIN PASSWORD :'app_ro_pw';
@@ -25,15 +25,21 @@ CREATE ROLE app_admin LOGIN PASSWORD :'app_admin_pw';
 GRANT USAGE ON SCHEMA public TO app_admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_admin;
 
--- Аудит: чтение и запись в query_log + резолюция identity для шлюза.
-CREATE ROLE app_audit LOGIN PASSWORD :'app_audit_pw';
-GRANT USAGE ON SCHEMA public TO app_audit;
-GRANT SELECT, INSERT ON query_log TO app_audit;
+-- Служебная роль приложения: аудит (query_log) + auth (users) + резолюция identity.
+CREATE ROLE app_service LOGIN PASSWORD :'app_service_pw';
+GRANT USAGE ON SCHEMA public TO app_service;
+
+-- Аудит: чтение и запись в query_log.
+GRANT SELECT, INSERT ON query_log TO app_service;
 -- USAGE на последовательность id (BIGSERIAL), иначе INSERT без id не сработает
-GRANT USAGE ON SEQUENCE query_log_id_seq TO app_audit;
--- Шлюз резолвит users.id -> internal_id для RLS-контекста. Только две колонки:
--- не password_hash/email/external_id и т.п. (см. ADR 21).
-GRANT SELECT (id, internal_id) ON users TO app_audit;
+GRANT USAGE ON SEQUENCE query_log_id_seq TO app_service;
+
+-- Auth и резолюция identity: полный доступ к users (учётным записям приложения).
+-- app_service не имеет прав на доменные таблицы (students/staff и т.п.).
+GRANT SELECT, INSERT, UPDATE ON users TO app_service;
+-- USAGE на последовательность id (SERIAL), иначе INSERT без id не сработает
+GRANT USAGE ON SEQUENCE users_id_seq TO app_service;
+-- DELETE сознательно не выдаём: деактивация учётки мягкая (is_active = FALSE).
 
 -- Закрываем PII-колонки для app_ro (рабочая роль не видит персональные данные)
 REVOKE SELECT (name, surname, patronymic, passport) ON students FROM app_ro;

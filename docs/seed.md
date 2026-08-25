@@ -34,14 +34,18 @@
 
 ## Демо-пользователи
 
-Таблица `users` содержит 4 записи (external_id → роль + внутренний id):
+Таблица `users` содержит 4 записи (external_id → роль + внутренний id), все
+активны и имеют логин (`email = <external_id>@example.com`) и общий демо-пароль:
 
-| external_id    | role    | internal_id |
-| -------------- | ------- | ----------- |
-| demo_applicant | applicant | —           |
-| demo_student   | student | student_id 1 |
-| demo_teacher   | teacher | staff_id 4   |
-| demo_admin     | admin   | —           |
+| external_id    | role    | internal_id | email (логин)              | пароль      |
+| -------------- | ------- | ----------- | -------------------------- | ----------- |
+| demo_applicant | applicant | —          | demo_applicant@example.com | password123 |
+| demo_student   | student | student_id 1 | demo_student@example.com | password123 |
+| demo_teacher   | teacher | staff_id 4   | demo_teacher@example.com | password123 |
+| demo_admin     | admin   | —           | demo_admin@example.com   | password123 |
+
+Пароль хранится как bcrypt-хэш (`password_hash`). Вход в веб-интерфейс —
+по `email` и паролю.
 
 ## Верификация RLS на данных
 

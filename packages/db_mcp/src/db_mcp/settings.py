@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     database_url_admin: str = (
         "postgresql://app_admin:admin_secret@localhost:5432/university"
     )
-    database_url_audit: str = (
-        "postgresql://app_audit:audit_secret@localhost:5432/university"
+    database_url_service: str = (
+        "postgresql://app_service:service_secret@localhost:5432/university"
     )
     # Лимит исполнения одного запроса (мс). Ставится в начале транзакции
     # (SET LOCAL): защита от «зависших» SELECT, держащих соединение пула.
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         return {
             DbPool.RO: self.database_url_ro,
             DbPool.ADMIN: self.database_url_admin,
-            DbPool.AUDIT: self.database_url_audit,
+            DbPool.SERVICE: self.database_url_service,
         }[db_pool]
 
 

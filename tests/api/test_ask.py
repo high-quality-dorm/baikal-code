@@ -9,6 +9,7 @@ from app.api.ask import _pipeline_dep
 from app.api.schemas import Answer
 from app.gateway import GatewayError
 from app.main import create_app
+from app.services.providers import InMemoryAuthStore
 
 pytestmark = pytest.mark.usefixtures("rsa_keys")
 
@@ -39,7 +40,7 @@ class FakePipeline:
 
 
 def _make_client(error: Exception | None = None) -> tuple[TestClient, dict, FakePipeline]:
-    app = create_app()
+    app = create_app(auth_store=InMemoryAuthStore())
     fake = FakePipeline(error=error)
     app.dependency_overrides[_pipeline_dep] = lambda: fake
     client = TestClient(app)

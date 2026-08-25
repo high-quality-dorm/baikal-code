@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import asyncpg
+import bcrypt
 from faker import Faker
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -644,6 +645,10 @@ async def seed_users(ctx: SeedContext) -> None:
     demo_student_id = ctx.student_ids[0] if ctx.student_ids else None
     demo_teacher_id = ctx.staff_teachers[0] if ctx.staff_teachers else None
 
+    # Единый демо-пароль для всех демо-учёток (см. docs/seed.md)
+    demo_password = "password123"
+    demo_hash = bcrypt.hashpw(demo_password.encode(), bcrypt.gensalt()).decode()
+
     # Небольшой набор демо-аккаунтов
     users_data = [
         ("demo_admin", BusinessRole.ADMIN.value, None, "Ректор Иванов"),
@@ -660,9 +665,12 @@ async def seed_users(ctx: SeedContext) -> None:
 
     for external_id, role, internal_id, display in users_data:
         await ctx.conn.execute(
-            "INSERT INTO users (external_id, role, internal_id, display_name) VALUES ($1, $2, $3, $4) "
+            "INSERT INTO users (external_id, email, password_hash, role, internal_id, display_name, is_active) "
+            "VALUES ($1, $2, $3, $4, $5, $6, TRUE) "
             "ON CONFLICT (external_id) DO NOTHING",
             external_id,
+            f"{external_id}@example.com",
+            demo_hash,
             role,
             internal_id,
             display,

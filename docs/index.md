@@ -33,14 +33,14 @@
 | Что                                                   | Расположение                                 |
 | ----------------------------------------------------- | -------------------------------------------- |
 | Доменные сущности БД (с PII-метками)                  | `packages/db_mcp/src/db_mcp/models.py`       |
-| Модули шлюза db_mcp (roles/access/validate/schema/audit)    | `packages/db_mcp/src/db_mcp/`                 |
+| Модули шлюза db_mcp (roles/access/validate/schema/audit/userstore)    | `packages/db_mcp/src/db_mcp/`                 |
 | MCP-сервер шлюза (get_schema, execute_query)          | `packages/db_mcp/src/db_mcp/server.py`        |
 | API-схемы (Question, Answer, QueryMeta)                | `packages/app/src/app/api/schemas.py`        |
 | Конвейер text-to-SQL (`Pipeline`, `POST /api/v1/ask`)  | `packages/app/src/app/services/pipeline.py`, `api/ask.py` |
 | MCP-клиент к шлюзу (stdio)                             | `packages/app/src/app/gateway/client.py`      |
 | LLM-клиент (ChatOpenAI) и промпты                      | `packages/app/src/app/llm/`                   |
 | Схема БД (17 таблиц)                                  | `db/01_schema.sql`                           |
-| Роли и права (app_ro/app_admin/app_audit, PII-колонки) | `db/02_roles.sql`                            |
+| Роли и права (app_ro/app_admin/app_service, PII-колонки) | `db/02_roles.sql`                            |
 | Row-Level Security (students, academic_records)       | `db/03_rls.sql`                              |
 | Генератор синтетики                                   | `scripts/seed.py`                            |
 | Веб-интерфейс (React SPA: лендинг/чат/вход, токены, mock-ассистент) | `frontend/`                       |

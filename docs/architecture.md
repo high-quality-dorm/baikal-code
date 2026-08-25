@@ -18,7 +18,7 @@ packages/app  (FastAPI, конвейер text-to-SQL)
    │  5. пересказ результата по-русски вторым LLM-вызовом
    ▼
 packages/db_mcp  (ЕДИНСТВЕННЫЙ шлюз к БД)
-   │  - резолюция users.id → internal_id (через app_audit)
+   │  - резолюция users.id → internal_id (через app_service)
    │  - доступ к БД, RLS-контекст (app.user_id = internal_id), аудит
    │  - приложение НЕ ходит в БД напрямую
    ▼
@@ -28,7 +28,7 @@ PostgreSQL (roles + column-masking + RLS)
 **Identity (важно):** шлюз принимает `execute_query(sql, role, user_id)`, где
 `user_id` — **номер учётки** (`users.id`, он же `sub` из JWT). Шлюз сам резолвит
 его в доменный `internal_id` (student_id/staff_id) через служебную роль
-`app_audit` и ставит `app.user_id = internal_id` для RLS. В `query_log.user_id`
+`app_service` и ставит `app.user_id = internal_id` для RLS. В `query_log.user_id`
 пишется номер учётки (`users.id`). Приложение не знает про `internal_id`.
 
 Ключевой принцип: **приложение никогда не обращается к базе напрямую**. Весь доступ
@@ -40,15 +40,15 @@ PostgreSQL (roles + column-masking + RLS)
 ### packages/db_mcp
 Единственный шлюз доступа к базе данных. Всё, что касается безопасности, живёт здесь:
 - `roles.py` — канонический вокабуляр ролей: `BusinessRole`
-  (applicant/student/teacher/admin) и `DbPool` (ro/admin/audit); единый источник
+  (applicant/student/teacher/admin) и `DbPool` (ro/admin/service); единый источник
   для маппинга пулов соединений и RLS-контекста;
 - `access.py` — пулы соединений asyncpg по ролям PostgreSQL (`app_ro` /
-  `app_admin` / `app_audit`) и установка RLS-контекста
+  `app_admin` / `app_service`) и установка RLS-контекста
   (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
   создание пула сериализуется локом (гонка исключена); в транзакции ставится
   `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT;
   **резолюция identity**: `connection_for` принимает `user_id` = номер учётки
-  (`users.id`), резолвит его в `internal_id` через пул `app_audit` и ставит
+  (`users.id`), резолвит его в `internal_id` через пул `app_service` и ставит
   `app.user_id = internal_id`. Если internal_id отсутствует (admin/applicant,
   несуществующий `users.id`) — `app.user_id` не ставится вовсе: PostgreSQL
   хранит NULL в GUC как пустую строку, которая ломала бы политику
@@ -64,8 +64,10 @@ PostgreSQL (roles + column-masking + RLS)
 - `schema.py` — маскированное описание схемы для LLM из живого каталога БД
   (PII-колонки скрываются на уровне прав роли) + русские описания таблиц;
   PK/FK для генерации JOIN — из статического `TABLE_META`;
-- `audit.py` — запись запросов в `query_log` через выделенную роль `app_audit`;
+- `audit.py` — запись запросов в `query_log` через выделенную роль `app_service`;
   в `query_log.user_id` пишется номер учётки (`users.id`);
+- `userstore.py` — чтение/запись учётных записей (`users`) для auth через роль
+  `app_service`;
 - `server.py` — MCP-сервер (mcp 2.0, класс `MCPServer`) на stdio-транспорте.
 
 Инструменты MCP-сервера:
@@ -100,14 +102,15 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 - администратор управляет учётными записями: `POST/GET/PATCH/DELETE /api/v1/auth/users`;
   при создании учётки админ вручную указывает `internal_id` (student_id/staff_id) —
   резолюцию в RLS выполняет шлюз; неверный `internal_id` даёт пустой доступ по RLS;
-- хранилище учёток — `UserCredentialsStore` (протокол); сейчас подключён мок
-  `InMemoryAuthStore`, реальное хранилище через `db_mcp` — отдельный будущий этап.
+- хранилище учёток — `UserCredentialsStore` (протокол); реализация
+  `DbUserCredentialsStore` читает/пишет `users` через шлюз (`manage_user`).
 
 
 **Конвейер text-to-SQL и REST-слой**:
 - `app/gateway/client.py` — MCP-клиент к шлюзу `db_mcp` (stdio): `get_schema(role)`,
-  `execute_query(sql, role, user_id=users.id)`. Сессия MCP поднимается лениво при
-  первом обращении и держится до закрытия приложения (`Pipeline.close()`);
+  `execute_query(sql, role, user_id=users.id)`, `manage_user(...)`. Сессия MCP
+  поднимается лениво при первом обращении и держится до закрытия приложения
+  (`Pipeline.close()`);
 - `app/llm/` — конфигурируемый OpenAI-совместимый LLM-клиент
   (`langchain-openai`, `ChatOpenAI`; `llm_base_url`/`llm_api_key`/`llm_model`/
   `llm_temperature` из `Settings`) и системные промпты (`prompts.py`: только
@@ -147,8 +150,9 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
      студентов (`name`, `surname`, `patronymic`, `passport`) и без служебных таблиц
      `users`, `query_log`.
    - `app_admin` — как `app_ro` + права на PII-колонки студентов.
-   - `app_audit` — запись в `query_log` + `SELECT (id, internal_id) ON users`
-     (нужно шлюзу для резолюции identity; служебная роль, пользователям недоступна).
+   - `app_service` — служебная роль приложения: запись в `query_log` + чтение/запись
+     `users` (для auth) + резолюция identity для RLS; пользователям недоступна,
+     прав на доменные таблицы не имеет.
 
 2. **Колоночное сокрытие PII** — даже если роль угадана, колонки персональных данных
    физически недоступны для `app_ro`. Сначала снимается табличный SELECT со `students`,
@@ -172,7 +176,7 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
   `is_active` (деактивация учётки вместо удаления).
 - **Identity в потоке запроса:** JWT `sub` = номер учётки (`users.id`). Шлюз
   `execute_query` принимает `users.id` и сам резолвит его в `internal_id` через
-  `app_audit` (`SELECT internal_id FROM users WHERE id = $1`), затем ставит
+  `app_service` (`SELECT internal_id FROM users WHERE id = $1`), затем ставит
   `app.user_id = internal_id` для RLS. В `query_log.user_id` пишется `users.id`.
   Приложение не знает про `internal_id`; админ задаёт его при создании учётки.
 - Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в

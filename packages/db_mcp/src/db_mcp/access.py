@@ -9,7 +9,8 @@ Row-Level Security контекста (set_config app.role / app.user_id) в н�
 через единый словарь `_BUSINESS_ROLE_TO_POOL`:
     - applicant, student, teacher -> app_ro  (без PII-колонок студентов)
     - admin                        -> app_admin (полный доступ, включая PII)
-Запись в журнал аудита идёт через отдельную роль app_audit.
+Запись в журнал аудита, управление учётками и резолюция identity идут через
+служебную роль app_service.
 Канонический вокабуляр ролей — в db_mcp/roles.py.
 """
 
@@ -90,9 +91,9 @@ class Pools:
         business_role = _as_business_role(role)
         return await self._get(_BUSINESS_ROLE_TO_POOL[business_role])
 
-    async def audit(self) -> asyncpg.Pool:
-        """Пул роли аудита app_audit (запись в query_log)."""
-        return await self._get(DbPool.AUDIT)
+    async def service(self) -> asyncpg.Pool:
+        """Пул служебной роли app_service (аудит + auth + резолюция identity)."""
+        return await self._get(DbPool.SERVICE)
 
     async def close(self) -> None:
         """Закрыть все пулы."""
@@ -105,8 +106,9 @@ class Pools:
 async def resolve_internal_id(pools: Pools, user_id: str | int | None) -> str | None:
     """Резолвит номер учётки (`users.id`) в доменный `internal_id` (str).
 
-    Выполняется через служебную роль `app_audit`, которая имеет право только на
-    колонки (id, internal_id) таблицы users — без password_hash/email и прочего.
+    Выполняется через служебную роль `app_service`, которая имеет право на
+    чтение users (для auth) и аудит query_log. Чтение users для резолюции
+    identity здесь — часть её служебных обязанностей.
 
     Tolerant-поведение: пустой/нечисловой user_id, несуществующий users.id или
     NULL internal_id возвращают None (без ошибки). В connection_for это даёт
@@ -119,7 +121,7 @@ async def resolve_internal_id(pools: Pools, user_id: str | int | None) -> str | 
         user_key = int(user_id)
     except (TypeError, ValueError):
         return None
-    pool = await pools.audit()
+    pool = await pools.service()
     async with pool.acquire() as conn:
         internal_id = await conn.fetchval(
             "SELECT internal_id FROM users WHERE id = $1", user_key
@@ -142,7 +144,7 @@ async def connection_for(
     `user_id` — это **номер учётки** (`users.id`, он же `sub` из JWT), а не
     доменный internal_id. Перед установкой контекста он резолвится в
     internal_id (student_id/staff_id) через `resolve_internal_id` и служебную
-    роль `app_audit`. Для admin/applicant (internal_id может быть NULL) и для
+    роль `app_service`. Для admin/applicant (internal_id может быть NULL) и для
     несуществующего users.id `app.user_id` не ставится вовсе — настройка
     отсутствует, `current_setting('app.user_id', true)` вернёт NULL, что по
     RLS (deny-by-default) означает отсутствие строк. Такой вариант выбран,

@@ -83,6 +83,15 @@ class GatewayClient:
             raise GatewayError(f"Некорректный ответ шлюза: {raw!r}")
         return payload
 
+    async def manage_user(self, action: str, **params: Any) -> Any:
+        """Вызывает manage_user шлюза; возвращает распарсенный JSON-ответ."""
+        raw = await self._call("manage_user", {"action": action, **params})
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise GatewayError(f"Некорректный ответ шлюза: {raw!r}") from exc
+        return payload
+
     async def close(self) -> None:
         """Закрывает MCP-сессию и останавливает подпроцесс шлюза."""
         if self._session is not None:
