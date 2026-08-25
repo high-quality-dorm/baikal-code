@@ -25,6 +25,7 @@
 | 13 | Резолюция identity | Грант `app_audit` на `users(id, internal_id)`; `resolve_internal_id` + `connection_for` (users.id → internal_id для RLS); аудит пишет `users.id`; контракт MCP-инструмента обновлён | `f88d2f1`, `1fed9d4`, `60a0eaf` |
 | 14 | internal_id в учётках | `UserCreate.internal_id` (ge=1); `create_user` пробрасывает его в `Credentials`; bootstrap-админ → None; контракт JWT `sub` = users.id не меняется | `82c082f` |
 | 15 | Конвейер text-to-SQL | `langchain-openai` + конфиг LLM; MCP-клиент шлюза; LLM-клиент и промпты; `Pipeline`; `POST /api/v1/ask`; тесты | `745bd97`, `59d4343`, `3e3748f`, `8a3bd03`, `70bfc13` |
+| 16 | Frontend | React SPA (Vite) в `frontend/`: лендинг, чат, вход; токены/темы; гостевой доступ; вход через `/auth/login`; чат с mock-ассистентом до реализации `/ask` | (этап работы) |
 
 ## Что дальше
 

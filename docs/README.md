@@ -12,6 +12,7 @@
 ```
 packages/db_mcp/   единственный шлюз к БД: безопасность, валидация, RLS, аудит
 packages/app/      FastAPI-приложение: конвейер text-to-SQL поверх db_mcp
+frontend/          React SPA: лендинг, чат, вход (по design.md)
 db/                SQL: схема, роли, row-level security
 scripts/seed.py    генератор синтетических данных
 docs/              документация (индекс → docs/index.md)
@@ -36,6 +37,21 @@ make format     # форматирование (ruff)
 make check      # lint + type check (ruff, ty)
 make test       # pytest
 ```
+
+## Веб-интерфейс (frontend)
+
+SPA на React + Vite. Дизайн — в [design.md](design.md).
+
+```bash
+cd frontend
+npm install      # установить зависимости (первый раз)
+npm run dev      # dev-сервер на :5173, /api проксируется на :8000
+npm run build    # production-сборка в frontend/dist
+```
+
+Пока бэкенд-эндпоинт `/api/v1/ask` не реализован, чат при недоступности
+бэкенда отвечает локальным mock-ассистентом (детерминированно, по данным
+сида). Вход по логину/паролю работает через реальный `/api/v1/auth/login`.
 
 ## Документация
 
