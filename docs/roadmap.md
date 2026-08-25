@@ -18,6 +18,7 @@
 | 6 | Auth | JWT-аутентификация по логину/паролю (bcrypt), bootstrap-админ, CRUD учёток админом; расширение `users` (email/password_hash/is_active); пока на in-memory моке | `7ba4413` |
 | 7 | Роли db_mcp (E) | Канонический вокабуляр `BusinessRole`/`DbPool` в `roles.py`; единый маппинг пулов, `Pools.pool`/`dsn_for`; тесты маппинга и согласованности с RLS | `11a9637` |
 | 8 | Укрепление шлюза (A) | `statement_timeout` в транзакции (10 с), сериализация создания пулов локом; ужесточение валидации: FOR UPDATE/FOR SHARE, DML в любом узле дерева, расширенный чёрный список функций | `edc5f88`, `f547e38` |
+| 9 | Set-операции (B) | Валидация принимает UNION/UNION ALL/INTERSECT/EXCEPT с зажимом верхнего LIMIT; SELECT INTO проверяется по всему дереву (INTO у UNION на первом операнде) | `99f6818` |
 
 ## Что дальше
 
@@ -30,14 +31,6 @@
   правки `auth/schemas.py`, `services/auth.py`.
 - `scripts/seed.py`: демо-роли через `BusinessRole`.
 - Docs: `architecture.md` (app зависит от db_mcp), `roles.md`.
-
-### Этап B. Поддержка set-операций
-- Разрешить корень `Union` / `Intersect` / `Except` (UNION/UNION ALL/INTERSECT/
-  EXCEPT) с зажимом верхнего `LIMIT MAX_ROWS`; проверки `into`/locks/DML-дерева
-  сохраняются.
-- Тесты: set-операции принимаются, вложенные UNION в сабквери, мультистейтмент
-  отклоняется.
-- Обновление `docs/architecture.md` и `docs/decisions.md`.
 
 ### Этап C. Корректность ответа `execute_query`
 - Новый формат ответа: `columns` + `rows` (массив массивов). Колонки берутся из
