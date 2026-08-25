@@ -24,6 +24,7 @@
 | 12 | Роли в app и seed (E2) | app зависит от `db-mcp`; enum `Role` удалён, везде `BusinessRole`; `require_role(*BusinessRole)`; демо-роли сида через `BusinessRole` | `d2c69f8`, `ed67079` |
 | 13 | Резолюция identity | Грант `app_audit` на `users(id, internal_id)`; `resolve_internal_id` + `connection_for` (users.id → internal_id для RLS); аудит пишет `users.id`; контракт MCP-инструмента обновлён | `f88d2f1`, `1fed9d4`, `60a0eaf` |
 | 14 | internal_id в учётках | `UserCreate.internal_id` (ge=1); `create_user` пробрасывает его в `Credentials`; bootstrap-админ → None; контракт JWT `sub` = users.id не меняется | `82c082f` |
+| 15 | Конвейер text-to-SQL | `langchain-openai` + конфиг LLM; MCP-клиент шлюза; LLM-клиент и промпты; `Pipeline`; `POST /api/v1/ask`; тесты | `745bd97`, `59d4343`, `3e3748f`, `8a3bd03`, `70bfc13` |
 
 ## Что дальше
 
@@ -70,20 +71,20 @@ staff_id). JWT `sub` остаётся номером учётки (`users.id`) �
 Цель: полноценный `/ask`: схема под роль → LLM генерирует SQL → шлюз исполняет
 (RLS) → LLM пересказывает ответ по-русски.
 
-- [ ] **Шаг 15.1** Зависимость `langchain-openai`; конфиг LLM
+- [x] **Шаг 15.1** Зависимость `langchain-openai`; конфиг LLM
       (`llm_base_url`, `llm_api_key`, `llm_model`, `llm_temperature`),
       `db_mcp_command`; `.env.example`.
-- [ ] **Шаг 15.2** MCP-клиент `app/gateway/client.py`: stdio-запуск `db_mcp`,
+- [x] **Шаг 15.2** MCP-клиент `app/gateway/client.py`: stdio-запуск `db_mcp`,
       `get_schema(role)`, `execute_query(sql, role, user_id=users.id)`.
-- [ ] **Шаг 15.3** LLM-клиент `app/llm/llm.py` (OpenAI-совместимый, base_url/
+- [x] **Шаг 15.3** LLM-клиент `app/llm/llm.py` (OpenAI-совместимый, base_url/
       model/key из конфига) + `app/llm/prompts.py` (только read-only SELECT,
       лимиты, PII, безопасность).
-- [ ] **Шаг 15.4** Конвейер `app/services/pipeline.py`:
+- [x] **Шаг 15.4** Конвейер `app/services/pipeline.py`:
       schema → SQL → execute → NL-ответ → `Answer`.
-- [ ] **Шаг 15.5** Роутер `POST /api/v1/ask` (`Question` + auth) → `Answer`;
+- [x] **Шаг 15.5** Роутер `POST /api/v1/ask` (`Question` + auth) → `Answer`;
       подключить в `main.py`.
-- [ ] **Шаг 15.6** Тесты: `test_pipeline` (фейк LLM + фейк шлюз), `test_ask`.
-- [ ] **Шаг 15.7** Обновить `docs/architecture.md`, `docs/decisions.md`,
+- [x] **Шаг 15.6** Тесты: `test_pipeline` (фейк LLM + фейк шлюз), `test_ask`.
+- [x] **Шаг 15.7** Обновить `docs/architecture.md`, `docs/decisions.md`,
       `docs/roadmap.md`, `docs/index.md`; `make check`, `make test` → коммит →
       стоп → объяснение.
 
@@ -93,6 +94,7 @@ staff_id). JWT `sub` остаётся номером учётки (`users.id`) �
   (запись в `users`), что выходит за read-only рамки — отдельный этап.
 - Заполнение реальных значений LLM (`base_url`/`model`/`key`) в `.env` —
   делается вручную при эксплуатации.
+- Ретрай LLM при ошибке шлюза (см. ADR 24) — осознанно отложен.
 
 ## Текущее состояние
 
@@ -103,8 +105,12 @@ staff_id). JWT `sub` остаётся номером учётки (`users.id`) �
   с RLS-контекстом (шлюз резолвит `users.id` → `internal_id` через
   `app_audit`), маскирование схемы под роль, аудит в `query_log`
   (запросы — только SELECT, лимит строк 200).
-- Auth реализован (JWT по логину/паролю, управление учётками), но хранилище
-  учёток пока in-memory — подключение к `db_mcp` впереди.
+- Auth реализован (JWT по логину/паролю, управление учётками, админ задаёт
+  `internal_id`), но хранилище учёток пока in-memory — подключение к `db_mcp`
+  впереди.
+- Конвейер `/api/v1/ask` реализован: схема под роль → генерация SQL через LLM →
+  исполнение через шлюз → пересказ по-русски. Реальные значения LLM
+  заполняются в `.env` вручную.
 
 ## Открытые блокеры
 

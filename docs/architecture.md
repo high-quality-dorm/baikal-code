@@ -103,16 +103,20 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 - хранилище учёток — `UserCredentialsStore` (протокол); сейчас подключён мок
   `InMemoryAuthStore`, реальное хранилище через `db_mcp` — отдельный будущий этап.
 
-**Конвейер text-to-SQL и REST-слой** (планируемые модули, см.
-[roadmap.md](roadmap.md)):
+**Конвейер text-to-SQL и REST-слой**:
 - `app/gateway/client.py` — MCP-клиент к шлюзу `db_mcp` (stdio): `get_schema(role)`,
-  `execute_query(sql, role, user_id=users.id)`;
+  `execute_query(sql, role, user_id=users.id)`. Сессия MCP поднимается лениво при
+  первом обращении и держится до закрытия приложения (`Pipeline.close()`);
 - `app/llm/` — конфигурируемый OpenAI-совместимый LLM-клиент
-  (`llm_base_url`/`llm_api_key`/`llm_model`/`llm_temperature`) и системные промпты;
+  (`langchain-openai`, `ChatOpenAI`; `llm_base_url`/`llm_api_key`/`llm_model`/
+  `llm_temperature` из `Settings`) и системные промпты (`prompts.py`: только
+  read-only SELECT, лимиты, PII — второй слой защиты поверх шлюза);
 - `app/services/pipeline.py` — конвейер: схема под роль → генерация SQL через LLM →
   исполнение через шлюз (с `users.id`) → пересказ результата по-русски вторым
-  LLM-вызовом → `Answer`;
-- `POST /api/v1/ask` (`Question` + auth) → `Answer`.
+  LLM-вызовом → `Answer` с метаданными запроса (`QueryMeta`). Ошибка шлюза
+  (`GatewayError`) возвращается пользователю без ретрая LLM;
+- `POST /api/v1/ask` (`Question` + auth) → `Answer`; `role`/`user_id` берутся из
+  JWT (`sub` = номер учётки), контекст доступа задаёт шлюз по RLS.
 
 ## Модель безопасности (3 уровня)
 
