@@ -72,7 +72,7 @@ function buildAnswer(question) {
   }
   if (q.includes("направл") || q.includes("специальн")) {
     return {
-      text: `Открыто **${FACTS.specialties}** направлений подготовки на **${FACTS.faculties}** факультетах. Среднее число направлений на факультет — около ${Math.round(
+      text: `Открыто **${FACTS.specialties}** направлений подготовки на **${FACTS.faculties}** факультетах. Среднее число направлений на факультет около ${Math.round(
         FACTS.specialties / FACTS.faculties
       )}.`,
       row_count: FACTS.specialties,
@@ -81,7 +81,7 @@ function buildAnswer(question) {
   if (q.includes("балл") || q.includes("успеваем") || q.includes("оценк")) {
     const avg = 4.2;
     return {
-      text: `Средний балл по всем дисциплинам — **${avg.toFixed(
+      text: `Средний балл по всем дисциплинам **${avg.toFixed(
         2
       )}** (по ${FACTS.academicRecords.toLocaleString("ru-RU")} оценкам).`,
       row_count: 1,
@@ -103,7 +103,7 @@ function buildAnswer(question) {
   }
   if (q.includes("аудитор") || q.includes("комнат") || q.includes("помещен")) {
     return {
-      text: `Аудиторный фонд университета — **${FACTS.rooms}** аудиторий. Занятия проводятся в **${FACTS.scheduleSlots.toLocaleString(
+      text: `Аудиторный фонд университета **${FACTS.rooms}** аудиторий. Занятия проводятся в **${FACTS.scheduleSlots.toLocaleString(
         "ru-RU"
       )}** слотов в семестре.`,
       row_count: FACTS.rooms,
@@ -125,7 +125,7 @@ function buildAnswer(question) {
   }
   const n = rnd(120, 400);
   return {
-    text: `По запросу найдено **${n}** записей. Уточните вопрос — например, «сколько студентов», «средний балл» или «бюджетные места», — чтобы получить точный ответ.`,
+    text: `По запросу найдено **${n}** записей. Уточните вопрос (например, «сколько студентов», «средний балл» или «бюджетные места»), чтобы получить точный ответ.`,
     row_count: n,
   };
 }

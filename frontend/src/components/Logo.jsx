@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export default function Logo({ size = "md" }) {
   return (
-    <Link to="/" className="logo" aria-label="Baikal — на главную">
+    <Link to="/" className="logo" aria-label="Baikal, на главную">
       <span className="logo__mark">
         <svg
           width={size === "lg" ? 26 : 22}

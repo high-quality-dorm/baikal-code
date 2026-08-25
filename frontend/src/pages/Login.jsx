@@ -45,7 +45,7 @@ export default function Login() {
     <div className="login">
       <aside className="login__panel">
         <Logo />
-        <h2>Ваш вопрос — проверенный ответ</h2>
+        <h2>Ваш вопрос, проверенный ответ</h2>
         <p>
           Войдите, чтобы получать ответы по своей роли: студент, преподаватель
           или администрация.
@@ -53,7 +53,7 @@ export default function Login() {
         <ul className="login__panel-list">
           <li>
             <IconShield width={18} height={18} />
-            Роли и row-level security — каждый видит только свои данные
+            Роли и row-level security. Каждый видит только свои данные
           </li>
           <li>
             <IconLock width={18} height={18} />
