@@ -19,5 +19,15 @@ class Settings(BaseSettings):
     jwt_private_key_path: str = _DEFAULT_PRIVATE_KEY
     jwt_public_key_path: str = _DEFAULT_PUBLIC_KEY
 
+    # OpenAI-совместимый LLM (генерация SQL и пересказ ответа).
+    # Значения заполняются вручную в .env при эксплуатации.
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_model: str = ""
+    llm_temperature: float = 0.0
+
+    # Команда запуска шлюза db_mcp (используется MCP-клиентом по stdio).
+    db_mcp_command: str = "uv run db-mcp"
+
 
 settings = Settings()
