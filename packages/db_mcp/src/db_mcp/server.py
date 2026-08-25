@@ -6,8 +6,9 @@
 
 Инструменты:
 - get_schema(role) — маскированное под роль описание схемы для LLM;
-- execute_query(sql, role, user_id) — валидация, исполнение с RLS-контекстом
-  и аудит в query_log.
+- execute_query(sql, role, user_id) — валидация, резолюция identity
+  (user_id = номер учётки users.id -> internal_id), исполнение с
+  RLS-контекстом и аудит в query_log.
 """
 
 from __future__ import annotations
@@ -141,7 +142,13 @@ def build_server(settings: Settings | None = None) -> MCPServer:
 
     @server.tool(
         name="execute_query",
-        description="Исполнить read-only SQL-запрос с RLS-контекстом роли и записать его в аудит.",
+        description=(
+            "Исполнить read-only SQL-запрос с RLS-контекстом роли и записать его в аудит. "
+            "Параметр user_id — это номер учётки (users.id, он же sub из JWT), а не "
+            "доменный internal_id: шлюз сам резолвит его в internal_id (student_id/staff_id) "
+            "через служебную роль app_audit и использует его как RLS-контекст. В query_log "
+            "пишется именно users.id."
+        ),
     )
     async def execute_query_tool(sql: str, role: str, user_id: str) -> str:
         return await gateway.execute_query(sql, role, user_id)
