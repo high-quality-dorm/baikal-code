@@ -30,7 +30,11 @@ def _md_files() -> list[Path]:
     """Все markdown-файлы репозитория (кроме docs/, который обрабатываем отдельно)."""
     files: list[Path] = []
     for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts or ".venv" in path.parts:
+        if (
+            ".git" in path.parts
+            or ".venv" in path.parts
+            or "node_modules" in path.parts
+        ):
             continue
         files.append(path)
     return files
