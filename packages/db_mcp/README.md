@@ -30,6 +30,8 @@ uv run db-mcp   # MCP-сервер на stdio (см. db-mcp = "db_mcp.server:mai
 
 - `get_schema(role)` — описание схемы, маскированное под роль.
 - `execute_query(sql, role, user_id)` — валидация → исполнение с RLS → аудит.
+  Ответ: `{columns, rows, row_count, truncated, duration_ms}` (rows — массив
+  массивов, дубли колонок сохраняются; numeric — строкой без потери точности).
 
 Подробнее — в [docs/architecture.md](../../docs/architecture.md) и
 [docs/roles.md](../../docs/roles.md).

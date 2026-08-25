@@ -52,6 +52,10 @@ PostgreSQL (roles + column-masking + RLS)
 Инструменты MCP-сервера:
 - `get_schema(role)` — маскированное описание схемы под роль (для генерации SQL);
 - `execute_query(sql, role, user_id)` — валидация → исполнение с RLS → аудит.
+  Ответ: `{columns, rows, row_count, truncated, duration_ms}`, где `rows` —
+  массив массивов (по позициям колонок), `columns` берётся из `record.keys()`
+  (порядок и дубли сохраняются). Numeric-значения передаются строками без
+  потери точности.
 
 **Доменные сущности БД** — в `packages/db_mcp/src/db_mcp/models.py`. PII-поля
 студентов (`name`, `surname`, `patronymic`, `passport`) помечены комментарием

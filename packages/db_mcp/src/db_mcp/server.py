@@ -15,10 +15,12 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
+import asyncpg
 from mcp.server import MCPServer
 
 from db_mcp.access import Pools, connection_for
@@ -38,12 +40,30 @@ def _jsonable(value: object) -> object:
     if value is None or isinstance(value, (bool, int, str, float)):
         return value
     if isinstance(value, Decimal):
-        return float(value)
+        # Строка вместо float: без потери точности для numeric
+        return str(value)
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, UUID):
         return str(value)
     return str(value)
+
+
+def _serialize_records(
+    records: Sequence[asyncpg.Record],
+) -> tuple[list[str], list[list[object]]]:
+    """Колонки и строки результата без потери информации.
+
+    `record.keys()` сохраняет порядок колонок и их дубли (например, при
+    `SELECT *` из JOIN двух таблиц с одинаковыми именами колонок), а строки
+    строятся по позициям — в отличие от `dict(record)`, который дубли молча
+    теряет.
+    """
+    if not records:
+        return [], []
+    columns = list(records[0].keys())
+    rows = [[_jsonable(value) for value in record] for record in records]
+    return columns, rows
 
 
 class Gateway:
@@ -70,9 +90,7 @@ class Gateway:
             limit_applied = validated.limit_applied
             async with connection_for(self._pools, role, user_id) as conn:
                 records = await conn.fetch(validated.sql)
-            rows = [
-                {k: _jsonable(v) for k, v in dict(record).items()} for record in records
-            ]
+            columns, rows = _serialize_records(records)
             row_count = len(rows)
         except Exception as exc:
             error = str(exc)
@@ -90,7 +108,7 @@ class Gateway:
             )
         return json.dumps(
             {
-                "columns": list(rows[0]) if rows else [],
+                "columns": columns,
                 "rows": rows,
                 "row_count": row_count,
                 "truncated": limit_applied and row_count >= MAX_ROWS,
