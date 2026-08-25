@@ -42,6 +42,18 @@ def test_validate_accepts_read_only_select(sql: str) -> None:
         "SELECT * INTO t FROM students",
         "SELECT pg_sleep(10)",
         "SELECT pg_read_file('/etc/passwd')",
+        "SELECT pg_catalog.pg_sleep(10)",  # схема-квалифицированное имя
+        "SELECT nextval('query_log_id_seq')",
+        "SELECT currval('query_log_id_seq')",
+        "SELECT pg_advisory_lock(1)",
+        "SELECT pg_advisory_unlock(1)",
+        "SELECT pg_notify('chan', 'msg')",
+        "SELECT 1 FOR UPDATE",
+        "SELECT 1 FOR SHARE",
+        # DML, спрятанный в WITH (корень — SELECT, но это DML)
+        "WITH del AS (DELETE FROM students RETURNING *) SELECT * FROM del",
+        "WITH ins AS (INSERT INTO students (name) VALUES ('x') RETURNING *) SELECT * FROM ins",
+        "WITH upd AS (UPDATE students SET name = 'x' RETURNING *) SELECT * FROM upd",
         "SET LOCAL app.role = 'admin'",
         "SHOW ALL",
     ],

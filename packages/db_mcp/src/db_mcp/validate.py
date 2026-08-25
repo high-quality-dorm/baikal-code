@@ -5,7 +5,9 @@
 - ровно одно выражение (без мультистейтментов);
 - корень выражения — только SELECT (DDL/DML/COPY/SET и прочее отклоняется);
 - запрет SELECT INTO;
-- запрет вызова опасных функций (pg_sleep, pg_read_file и т.п.);
+- запрет изменяющих операций в любом узле дерева (DML в WITH/подзапросах);
+- запрет клаузы блокировки строк (FOR UPDATE / FOR SHARE);
+- запрет вызова опасных функций (pg_sleep, pg_read_file, nextval и т.п.);
 - гарантированный лимит строк (LIMIT), чтобы один запрос не выгружал всю базу.
 
 Разбор выполняется sqlglot с диалектом PostgreSQL: он корректно обрабатывает
@@ -48,6 +50,31 @@ FORBIDDEN_FUNCTIONS = frozenset(
         "lo_create",
         "dblink",
         "dblink_connect",
+        # последовательности (мутируют состояние БД)
+        "nextval",
+        "currval",
+        "setval",
+        # большие объекты: операции записи/чтения по дескриптору
+        "lo_open",
+        "lo_close",
+        "lo_unlink",
+        "lo_put",
+        "lo_truncate",
+        # advisory locks и уведомления
+        "pg_advisory_lock",
+        "pg_advisory_unlock",
+        "pg_advisory_unlock_all",
+        "pg_advisory_xact_lock",
+        "pg_try_advisory_lock",
+        "pg_try_advisory_xact_lock",
+        "pg_advisory_lock_shared",
+        "pg_advisory_unlock_shared",
+        "pg_try_advisory_lock_shared",
+        "pg_try_advisory_xact_lock_shared",
+        "pg_notify",
+        # снапшоты (нарушают изоляцию / дают доступ к чужим состояниям)
+        "pg_export_snapshot",
+        "pg_import_snapshot",
         # прочее опасное
         "pg_logdir_ls",
         "inet_server_addr",
@@ -56,6 +83,20 @@ FORBIDDEN_FUNCTIONS = frozenset(
         "current_setting",
         "set_config",
     }
+)
+
+
+# Изменяющие данные операции. Запрещены даже внутри WITH/подзапросов:
+# `WITH del AS (DELETE ... RETURNING *) SELECT * FROM del` имеет корень Select,
+# но выполняет DML — такие запросы отсекаются на уровне валидации, а не только
+# грантами БД.
+_MUTATING_NODES = (
+    exp.Delete,
+    exp.Insert,
+    exp.Update,
+    exp.Merge,
+    exp.Command,
+    exp.Copy,
 )
 
 
@@ -102,6 +143,25 @@ def _check_forbidden_functions(tree: exp.Expression) -> None:
             raise ValidationError(f"Функция {name} запрещена")
 
 
+def _check_read_only_tree(tree: exp.Expression) -> None:
+    """Отклонить запрос, содержащий изменяющие данные операции.
+
+    Корень может быть SELECT, но DML может прятаться в WITH-выражениях или
+    подзапросах (например, `WITH del AS (DELETE ... RETURNING *) SELECT *`
+    из del). Ходим по всему дереву и отсекаем мутирующие узлы.
+    """
+    for node in tree.walk():
+        if isinstance(node, _MUTATING_NODES):
+            raise ValidationError("Запрос должен быть read-only (SELECT)")
+
+
+def _check_no_locks(tree: exp.Expression) -> None:
+    """Отклонить SELECT с клаузой блокировки строк (FOR UPDATE/FOR SHARE)."""
+    for node in tree.walk():
+        if isinstance(node, exp.Select) and node.args.get("locks"):
+            raise ValidationError("FOR UPDATE / FOR SHARE запрещены")
+
+
 def validate(sql: str) -> ValidatedQuery:
     """Проверить SQL и вернуть нормализованный безопасный запрос.
 
@@ -130,6 +190,8 @@ def validate(sql: str) -> ValidatedQuery:
         raise ValidationError("Разрешены только SELECT-запросы")
     if tree.args.get("into") is not None:
         raise ValidationError("SELECT INTO запрещён")
+    _check_read_only_tree(tree)
+    _check_no_locks(tree)
     _check_forbidden_functions(tree)
 
     limit = _existing_limit(tree)
