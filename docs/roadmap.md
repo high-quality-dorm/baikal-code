@@ -25,15 +25,71 @@
 
 ## Что дальше
 
-Запланированные этапы улучшения `db_mcp` и приложения. Каждый — реализация →
+Работа идёт **поэтапно**. Каждый этап делится на шаги; каждый шаг — реализация →
 `make check` → коммит → объяснение пользователю → подтверждение на следующий.
+Этапы связаны и идут в порядке: шлюз → auth → конвейер.
 
-### После: приложение (packages/app)
-- Конвейер text-to-SQL: генерация SQL через LLM (LangChain), валидация,
-  ролевое маскирование схемы, вызов шлюза через MCP, форматирование ответа.
-- REST-эндпоинты FastAPI поверх этого.
+### Этап 13 — Шлюз: резолюция identity (packages/db_mcp)
+Цель: MCP-инструмент `execute_query` принимает **номер учётки** (`users.id`),
+а шлюз сам резолвит его в доменный `internal_id` (student_id/staff_id) через
+служебную роль `app_audit`. Приложение не знает про `internal_id`.
+
+- [ ] **Шаг 13.1** Права: `app_audit` получает `SELECT (id, internal_id) ON users`
+      (нужно резолверу). Обновить `docs/roles.md`, ADR.
+- [ ] **Шаг 13.2** Резолвер `resolve_internal_id(pools, user_id)`:
+      `SELECT internal_id FROM users WHERE id = $1` через пул `app_audit`.
+      `connection_for` резолвит `user_id` и ставит `app.user_id = internal_id`.
+      Несуществующий `users.id`/NULL → `app.user_id = NULL` → нет доступа по RLS
+      (безопасно, без ошибки). RLS-политики не меняются.
+- [ ] **Шаг 13.3** Аудит: в `query_log.user_id` писать номер учётки (`users.id`),
+      а не резолвленный `internal_id`.
+- [ ] **Шаг 13.4** Контракт: в MCP-инструменте параметр `user_id` документально
+      трактуется как `users.id` (номер учётки); описание инструмента обновить.
+- [ ] **Шаг 13.5** Тесты: резолвер (найден/NULL/несуществующий), NULL-поведение
+      `connection_for`, аудит с `users.id`. Обновить `test_access`, `test_server`.
+- [ ] `make check`, `make test` → коммит → стоп → объяснение.
+
+### Этап 14 — Auth: internal_id в учётках (packages/app)
+Цель: админ при создании учётки вручную указывает `internal_id` (student_id/
+staff_id). JWT `sub` остаётся номером учётки (`users.id`) — контракт токена не
+меняется; резолюцию выполняет шлюз (этап 13).
+
+- [ ] **Шаг 14.1** `UserCreate.internal_id: int | None` (админ задаёт вручную).
+- [ ] **Шаг 14.2** `AuthService.create_user` пробрасывает `internal_id` в
+      `Credentials`; bootstrap-админ → `internal_id=None`.
+- [ ] **Шаг 14.3** Роутер `POST /auth/users` принимает `internal_id`. Проверки
+      существования студента/преподавателя нет — неверный ID даёт пустой RLS.
+- [ ] **Шаг 14.4** Тесты создания учётки с `internal_id`; обновить
+      `test_api`, `test_auth`; обновить `docs/roles.md`, `docs/architecture.md`.
+- [ ] `make check`, `make test` → коммит → стоп → объяснение.
+
+### Этап 15 — Конвейер text-to-SQL + POST /api/v1/ask (packages/app)
+Цель: полноценный `/ask`: схема под роль → LLM генерирует SQL → шлюз исполняет
+(RLS) → LLM пересказывает ответ по-русски.
+
+- [ ] **Шаг 15.1** Зависимость `langchain-openai`; конфиг LLM
+      (`llm_base_url`, `llm_api_key`, `llm_model`, `llm_temperature`),
+      `db_mcp_command`; `.env.example`.
+- [ ] **Шаг 15.2** MCP-клиент `app/gateway/client.py`: stdio-запуск `db_mcp`,
+      `get_schema(role)`, `execute_query(sql, role, user_id=users.id)`.
+- [ ] **Шаг 15.3** LLM-клиент `app/llm/llm.py` (OpenAI-совместимый, base_url/
+      model/key из конфига) + `app/llm/prompts.py` (только read-only SELECT,
+      лимиты, PII, безопасность).
+- [ ] **Шаг 15.4** Конвейер `app/services/pipeline.py`:
+      schema → SQL → execute → NL-ответ → `Answer`.
+- [ ] **Шаг 15.5** Роутер `POST /api/v1/ask` (`Question` + auth) → `Answer`;
+      подключить в `main.py`.
+- [ ] **Шаг 15.6** Тесты: `test_pipeline` (фейк LLM + фейк шлюз), `test_ask`.
+- [ ] **Шаг 15.7** Обновить `docs/architecture.md`, `docs/decisions.md`,
+      `docs/roadmap.md`, `docs/index.md`; `make check`, `make test` → коммит →
+      стоп → объяснение.
+
+### После (вне текущего цикла)
 - Реальное хранилище учёток `UserCredentialsStore` на основе `db_mcp`
-  (сейчас auth работает на in-memory моке).
+  (сейчас auth работает на in-memory моке). Требует admin-write в шлюзе
+  (запись в `users`), что выходит за read-only рамки — отдельный этап.
+- Заполнение реальных значений LLM (`base_url`/`model`/`key`) в `.env` —
+  делается вручную при эксплуатации.
 
 ## Текущее состояние
 

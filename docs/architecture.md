@@ -8,20 +8,28 @@
 
 ```
 Пользователь (HTTP)
-   │  POST /ask  { question, роль, user_id }
+   │  POST /ask  { question }
    ▼
 packages/app  (FastAPI, конвейер text-to-SQL)
-   │  1. аутентификация/идентификация (JWT: вход по логину/паролю)
-   │  2. генерация SQL через LLM (LangChain, OpenAI-совместимый API)
-   │  3. валидация и маскирование схемы под роль
-   │  4. вызов шлюза (MCP, stdio transport)
+   │  1. аутентификация (JWT: вход по логину/паролю; sub = users.id)
+   │  2. генерация SQL через LLM (OpenAI-совместимый API, конфигурируемый)
+   │  3. ролевое маскирование схемы (get_schema)
+   │  4. вызов шлюза (MCP, stdio transport; передаётся users.id)
+   │  5. пересказ результата по-русски вторым LLM-вызовом
    ▼
 packages/db_mcp  (ЕДИНСТВЕННЫЙ шлюз к БД)
-   │  - доступ к БД, RLS-контекст, аудит запросов
+   │  - резолюция users.id → internal_id (через app_audit)
+   │  - доступ к БД, RLS-контекст (app.user_id = internal_id), аудит
    │  - приложение НЕ ходит в БД напрямую
    ▼
 PostgreSQL (roles + column-masking + RLS)
 ```
+
+**Identity (важно):** шлюз принимает `execute_query(sql, role, user_id)`, где
+`user_id` — **номер учётки** (`users.id`, он же `sub` из JWT). Шлюз сам резолвит
+его в доменный `internal_id` (student_id/staff_id) через служебную роль
+`app_audit` и ставит `app.user_id = internal_id` для RLS. В `query_log.user_id`
+пишется номер учётки (`users.id`). Приложение не знает про `internal_id`.
 
 Ключевой принцип: **приложение никогда не обращается к базе напрямую**. Весь доступ
 идёт только через `db_mcp`, где сосредоточены безопасность, валидация, ролевое
@@ -39,6 +47,10 @@ PostgreSQL (roles + column-masking + RLS)
   (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
   создание пула сериализуется локом (гонка исключена); в транзакции ставится
   `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT;
+  **резолюция identity**: `connection_for` принимает `user_id` = номер учётки
+  (`users.id`), резолвит его в `internal_id` через пул `app_audit` и ставит
+  `app.user_id = internal_id` (для admin/applicant — NULL, что безопасно:
+  RLS-политики для них не зависят от `user_id`);
 - `validate.py` — валидация SQL (sqlglot): ровно один read-only запрос —
   SELECT или set-операция (UNION/INTERSECT/EXCEPT), запрет опасных функций
   (включая nextval/pg_advisory_*), запрет DML в любом узле дерева
@@ -50,11 +62,14 @@ PostgreSQL (roles + column-masking + RLS)
   (PII-колонки скрываются на уровне прав роли) + русские описания таблиц;
   PK/FK для генерации JOIN — из статического `TABLE_META`;
 - `audit.py` — запись запросов в `query_log` через выделенную роль `app_audit`;
+  в `query_log.user_id` пишется номер учётки (`users.id`);
 - `server.py` — MCP-сервер (mcp 2.0, класс `MCPServer`) на stdio-транспорте.
 
 Инструменты MCP-сервера:
 - `get_schema(role)` — маскированное описание схемы под роль (для генерации SQL);
-- `execute_query(sql, role, user_id)` — валидация → исполнение с RLS → аудит.
+- `execute_query(sql, role, user_id)` — валидация → резолюция identity →
+  исполнение с RLS → аудит. `user_id` здесь — **номер учётки** (`users.id`),
+  а не доменный ID; резолюцию в `internal_id` выполняет сам шлюз.
   Ответ: `{columns, rows, row_count, truncated, duration_ms}`, где `rows` —
   массив массивов (по позициям колонок), `columns` берётся из `record.keys()`
   (порядок и дубли сохраняются). Numeric-значения передаются строками без
@@ -76,11 +91,25 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
 **Auth-подсистема** (`packages/app/src/app/auth/` + `core/security.py` + `services/`):
 - вход по логину/паролю → JWT access-токен (RS256), подписанный RSA-ключом;
   роль и идентификатор учётки (`sub`) берутся из токена; пароли хэшируются bcrypt;
+  `sub` = номер учётки (`users.id`);
 - эндпоинты `/api/v1/auth/login` и `/api/v1/auth/bootstrap-admin` (создание первого
   админа, только если админов ещё нет);
 - администратор управляет учётными записями: `POST/GET/PATCH/DELETE /api/v1/auth/users`;
+  при создании учётки админ вручную указывает `internal_id` (student_id/staff_id) —
+  резолюцию в RLS выполняет шлюз; неверный `internal_id` даёт пустой доступ по RLS;
 - хранилище учёток — `UserCredentialsStore` (протокол); сейчас подключён мок
   `InMemoryAuthStore`, реальное хранилище через `db_mcp` — отдельный будущий этап.
+
+**Конвейер text-to-SQL и REST-слой** (планируемые модули, см.
+[roadmap.md](roadmap.md)):
+- `app/gateway/client.py` — MCP-клиент к шлюзу `db_mcp` (stdio): `get_schema(role)`,
+  `execute_query(sql, role, user_id=users.id)`;
+- `app/llm/` — конфигурируемый OpenAI-совместимый LLM-клиент
+  (`llm_base_url`/`llm_api_key`/`llm_model`/`llm_temperature`) и системные промпты;
+- `app/services/pipeline.py` — конвейер: схема под роль → генерация SQL через LLM →
+  исполнение через шлюз (с `users.id`) → пересказ результата по-русски вторым
+  LLM-вызовом → `Answer`;
+- `POST /api/v1/ask` (`Question` + auth) → `Answer`.
 
 ## Модель безопасности (3 уровня)
 
@@ -91,7 +120,8 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
      студентов (`name`, `surname`, `patronymic`, `passport`) и без служебных таблиц
      `users`, `query_log`.
    - `app_admin` — как `app_ro` + права на PII-колонки студентов.
-   - `app_audit` — только чтение/запись в `query_log`.
+   - `app_audit` — запись в `query_log` + `SELECT (id, internal_id) ON users`
+     (нужно шлюзу для резолюции identity; служебная роль, пользователям недоступна).
 
 2. **Колоночное сокрытие PII** — даже если роль угадана, колонки персональных данных
    физически недоступны для `app_ro`. Сначала снимается табличный SELECT со `students`,
@@ -99,8 +129,9 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
    перекрывает колоночный REVOKE).
 
 3. **Row-Level Security** (`db/03_rls.sql`), deny-by-default:
-   - контекст задаётся приложением в начале транзакции:
+   - контекст задаётся шлюзом в начале транзакции:
      `SET LOCAL app.role = 'student' | 'teacher' | 'admin'; SET LOCAL app.user_id = '<internal_id>';`
+     где `internal_id` шлюз резолвит из `users.id`;
    - без контекста строк не видно;
    - студент видит только свою строку в `students` и только свои оценки;
    - преподаватель видит оценки только по своим курсам;
@@ -112,6 +143,11 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
   `external_id` → `role` + `internal_id` (student_id или staff_id) + `display_name`.
   Для auth добавлены колонки: `email` (логин, UNIQUE), `password_hash` (bcrypt),
   `is_active` (деактивация учётки вместо удаления).
+- **Identity в потоке запроса:** JWT `sub` = номер учётки (`users.id`). Шлюз
+  `execute_query` принимает `users.id` и сам резолвит его в `internal_id` через
+  `app_audit` (`SELECT internal_id FROM users WHERE id = $1`), затем ставит
+  `app.user_id = internal_id` для RLS. В `query_log.user_id` пишется `users.id`.
+  Приложение не знает про `internal_id`; админ задаёт его при создании учётки.
 - Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в
   [roles.md](roles.md).
 - Канонические значения ролей — `BusinessRole` в
