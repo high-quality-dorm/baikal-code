@@ -113,3 +113,23 @@ def test_validate_clamps_too_large_limit_on_union() -> None:
     result = validate("SELECT 1 UNION SELECT 2 LIMIT 1000000")
     assert result.limit_applied is True
     assert f"LIMIT {MAX_ROWS}" in result.sql
+
+
+def test_validate_accepts_limit_all_and_clamps() -> None:
+    result = validate("SELECT * FROM students LIMIT ALL")
+    assert result.limit_applied is True
+    assert f"LIMIT {MAX_ROWS}" in result.sql
+
+
+def test_validate_accepts_limit_all_lowercase() -> None:
+    result = validate("select 1 limit all")
+    assert result.limit_applied is True
+    assert f"LIMIT {MAX_ROWS}" in result.sql
+
+
+def test_validate_does_not_touch_string_literal_limit_all() -> None:
+    """Строковый литерал с «LIMIT ALL» не должен искажаться fallback'ом."""
+    result = validate("SELECT 'LIMIT ALL'")
+    assert "'LIMIT ALL'" in result.sql  # литерал остался как есть
+    assert "LIMIT 201" not in result.sql  # fallback-замена не применялась
+    assert result.limit_applied is True  # лимит добавлен штатно (в запросе его не было)

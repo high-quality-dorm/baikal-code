@@ -14,7 +14,8 @@ PostgreSQL напрямую — только через этот пакет, г�
   (10 с по умолчанию).
 - `validate.py` — валидация SQL (sqlglot): только один read-only запрос
   (SELECT или UNION/INTERSECT/EXCEPT), запрет опасных функций, DML в любом
-  узле дерева, FOR UPDATE/FOR SHARE, лимит строк (`MAX_ROWS = 200`).
+  узле дерева, FOR UPDATE/FOR SHARE, лимит строк (`MAX_ROWS = 200`);
+  `LIMIT ALL` принимается и зажимается до лимита.
 - `schema.py` — маскированное описание схемы для LLM из каталога БД + русские
   описания таблиц и колонок.
 - `audit.py` — запись запросов в `query_log` через роль `app_audit`.

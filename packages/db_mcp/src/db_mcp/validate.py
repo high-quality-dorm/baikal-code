@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import sqlglot
@@ -25,6 +26,11 @@ from sqlglot.errors import ParseError
 
 # Максимум строк, возвращаемых одним запросом
 MAX_ROWS = 200
+
+# Валидный PostgreSQL `LIMIT ALL` (безлимит) sqlglot не разбирает.
+# Используется как fallback только при ошибке парсинга: `LIMIT ALL`
+# заменяется на большой лимит, который после проверки зажмётся до MAX_ROWS.
+_LIMIT_ALL_RE = re.compile(r"\bLIMIT\s+ALL\b", re.IGNORECASE)
 
 # Функции, вызов которых запрещён даже внутри read-only SELECT
 FORBIDDEN_FUNCTIONS = frozenset(
@@ -194,7 +200,14 @@ def validate(sql: str) -> ValidatedQuery:
     try:
         statements = sqlglot.parse(sql, read="postgres")
     except ParseError as exc:
-        raise ValidationError(f"Не удалось разобрать SQL: {exc}") from exc
+        # `LIMIT ALL` — валидный PostgreSQL, но sqlglot его не разбирает.
+        # Fallback срабатывает только при ошибке парсинга: запросы, где
+        # «LIMIT ALL» встречается в строковых литералах или комментариях,
+        # парсятся штатно и не затрагиваются.
+        if not _LIMIT_ALL_RE.search(sql):
+            raise ValidationError(f"Не удалось разобрать SQL: {exc}") from exc
+        fixed = _LIMIT_ALL_RE.sub(f"LIMIT {MAX_ROWS + 1}", sql)
+        statements = sqlglot.parse(fixed, read="postgres")
 
     # Отбрасываем служебные узлы (завершающие точки с запятой)
     statements = [

@@ -43,7 +43,9 @@ PostgreSQL (roles + column-masking + RLS)
   SELECT или set-операция (UNION/INTERSECT/EXCEPT), запрет опасных функций
   (включая nextval/pg_advisory_*), запрет DML в любом узле дерева
   (WITH-выражения), запрет FOR UPDATE/FOR SHARE и SELECT INTO по всему дереву,
-  гарантированный лимит строк (`MAX_ROWS = 200`);
+  гарантированный лимит строк (`MAX_ROWS = 200`); валидный PostgreSQL
+  `LIMIT ALL` принимается и зажимается до лимита (fallback при ошибке
+  парсинга не искажает литералы);
 - `schema.py` — маскированное описание схемы для LLM из живого каталога БД
   (PII-колонки скрываются на уровне прав роли) + русские описания таблиц;
 - `audit.py` — запись запросов в `query_log` через выделенную роль `app_audit`;
