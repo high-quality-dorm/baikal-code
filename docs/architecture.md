@@ -37,6 +37,8 @@ PostgreSQL (roles + column-masking + RLS)
 - `access.py` — пулы соединений asyncpg по ролям PostgreSQL (`app_ro` /
   `app_admin` / `app_audit`) и установка RLS-контекста
   (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
+  создание пула сериализуется локом (гонка исключена); в транзакции ставится
+  `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT;
 - `validate.py` — валидация SQL (sqlglot): ровно один read-only SELECT,
   запрет опасных функций, гарантированный лимит строк (`MAX_ROWS = 200`);
 - `schema.py` — маскированное описание схемы для LLM из живого каталога БД

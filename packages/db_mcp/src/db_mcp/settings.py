@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     database_url_audit: str = (
         "postgresql://app_audit:audit_secret@localhost:5432/university"
     )
+    # Лимит исполнения одного запроса (мс). Ставится в начале транзакции
+    # (SET LOCAL): защита от «зависших» SELECT, держащих соединение пула.
+    statement_timeout_ms: int = 10_000
 
     def dsn_for(self, db_pool: DbPool) -> str:
         """Строка подключения для роли PostgreSQL (единая точка)."""

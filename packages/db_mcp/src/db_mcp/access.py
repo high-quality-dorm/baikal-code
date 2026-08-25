@@ -15,6 +15,7 @@ Row-Level Security контекста (set_config app.role / app.user_id) в н�
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -58,15 +59,26 @@ class Pools:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._pools: dict[DbPool, asyncpg.Pool] = {}
+        # Сериализует создание пула: два параллельных первых обращения не
+        # должны создать два пула (второй утёк бы).
+        self._lock = asyncio.Lock()
+
+    @property
+    def statement_timeout_ms(self) -> int:
+        """Лимит исполнения одного запроса (мс), применяется в транзакции."""
+        return self._settings.statement_timeout_ms
 
     async def _get(self, db_pool: DbPool) -> asyncpg.Pool:
         """Вернуть пул, создав его при первом обращении."""
         pool = self._pools.get(db_pool)
         if pool is None:
-            pool = await asyncpg.create_pool(
-                self._settings.dsn_for(db_pool), min_size=1, max_size=10
-            )
-            self._pools[db_pool] = pool
+            async with self._lock:
+                pool = self._pools.get(db_pool)
+                if pool is None:
+                    pool = await asyncpg.create_pool(
+                        self._settings.dsn_for(db_pool), min_size=1, max_size=10
+                    )
+                    self._pools[db_pool] = pool
         return pool
 
     async def pool(self, db_pool: DbPool) -> asyncpg.Pool:
@@ -84,9 +96,10 @@ class Pools:
 
     async def close(self) -> None:
         """Закрыть все пулы."""
-        for pool in self._pools.values():
-            await pool.close()
-        self._pools.clear()
+        async with self._lock:
+            for pool in self._pools.values():
+                await pool.close()
+            self._pools.clear()
 
 
 @asynccontextmanager
@@ -100,6 +113,9 @@ async def connection_for(
     на время её выполнения. Без контекста политики RLS (deny-by-default)
     не пропустят ни одной строки. Роль нормализуется в pool_for_role —
     неизвестная роль отклоняется до обращения к БД.
+
+    Также в транзакции задаётся `statement_timeout` (is_local=true): тяжёлый
+    запрос не может держать соединение пула дольше заданного лимита.
     """
     business_role = _as_business_role(role)
     pool = await pools.pool_for_role(business_role)
@@ -108,4 +124,8 @@ async def connection_for(
             "SELECT set_config('app.role', $1, true)", business_role.value
         )
         await conn.execute("SELECT set_config('app.user_id', $1, true)", user_id)
+        await conn.execute(
+            "SELECT set_config('statement_timeout', $1, true)",
+            str(pools.statement_timeout_ms),
+        )
         yield conn
