@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from db_mcp.roles import DbPool
+
 
 class Settings(BaseSettings):
     """Строки подключения ролей приложения к PostgreSQL."""
@@ -22,6 +24,14 @@ class Settings(BaseSettings):
     database_url_audit: str = (
         "postgresql://app_audit:audit_secret@localhost:5432/university"
     )
+
+    def dsn_for(self, db_pool: DbPool) -> str:
+        """Строка подключения для роли PostgreSQL (единая точка)."""
+        return {
+            DbPool.RO: self.database_url_ro,
+            DbPool.ADMIN: self.database_url_admin,
+            DbPool.AUDIT: self.database_url_audit,
+        }[db_pool]
 
 
 settings = Settings()

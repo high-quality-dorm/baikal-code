@@ -31,6 +31,9 @@ PostgreSQL (roles + column-masking + RLS)
 
 ### packages/db_mcp
 Единственный шлюз доступа к базе данных. Всё, что касается безопасности, живёт здесь:
+- `roles.py` — канонический вокабуляр ролей: `BusinessRole`
+  (applicant/student/teacher/admin) и `DbPool` (ro/admin/audit); единый источник
+  для маппинга пулов соединений и RLS-контекста;
 - `access.py` — пулы соединений asyncpg по ролям PostgreSQL (`app_ro` /
   `app_admin` / `app_audit`) и установка RLS-контекста
   (`set_config('app.role', ...)`, `app.user_id`) в начале транзакции;
@@ -97,6 +100,9 @@ FastAPI-приложение: сам конвейер text-to-SQL поверх `
   `is_active` (деактивация учётки вместо удаления).
 - Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в
   [roles.md](roles.md).
+- Канонические значения ролей — `BusinessRole` в
+  `packages/db_mcp/src/db_mcp/roles.py`; маппинг бизнес-ролей на пулы
+  PostgreSQL — единый словарь `_BUSINESS_ROLE_TO_POOL` в `access.py`.
 
 ## Схема БД
 

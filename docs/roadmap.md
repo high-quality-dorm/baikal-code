@@ -22,24 +22,26 @@
 Запланированные этапы улучшения `db_mcp` и приложения. Каждый — реализация →
 `make check` → коммит → объяснение пользователю → подтверждение на следующий.
 
-### Этап E. Унификация маппингов ролей
+### Этап E. Унификация маппингов ролей в db_mcp
 - Новый модуль `db_mcp/roles.py`: канонический вокабуляр ролей —
   `BusinessRole(str, Enum)` (applicant/student/teacher/admin) и `DbPool(Enum)`
-  (ro/admin/audit). Единый источник вместо констант в `access.py` и enum
-  `Role` в `app/api/schemas.py`.
+  (ro/admin/audit). Единый источник вместо констант в `access.py`.
 - `access.py`: единый словарь `_BUSINESS_ROLE_TO_POOL: dict[BusinessRole, DbPool]`;
   `BUSINESS_ROLES` выводится из `BusinessRole`; один метод `Pools.pool(db_pool)`
   и `Settings.dsn_for(db_pool)`; `pool_for_role` нормализует `BusinessRole(role)`;
-  удалить строковые ключи «ro/admin» и ветку `key == "admin"`.
-- `app`: зависимость `db-mcp` в `pyproject.toml`; удалить `Role` из
+  удалить строковые ключи «ro/admin», ветку `key == "admin"` и дублирующую
+  проверку роли в `connection_for`.
+- Тесты: `test_access.py` (маппинг всех ролей, нормализация, `UnknownRoleError`),
+  новый `test_roles.py` (литералы ролей в `db/03_rls.sql` ⊆ `BusinessRole`).
+- Docs: `architecture.md` (единый источник ролей), `decisions.md` (новый ADR),
+  `roles.md` — в рамках этапа.
+
+### Этап E2. Роли в app и seed (после E)
+- `app`: зависимость `db-mcp` в `pyproject.toml`; удалить enum `Role` из
   `api/schemas.py`; везде `BusinessRole`; `require_role(*BusinessRole)`;
   правки `auth/schemas.py`, `services/auth.py`.
 - `scripts/seed.py`: демо-роли через `BusinessRole`.
-- `db/03_rls.sql`: строки ролей остаются (SQL); добавляется тест согласованности:
-  литералы ролей в RLS и сиде ⊆ значений `BusinessRole`.
-- Тесты: `test_access.py` (enum-маппинг, `UnknownRoleError`), новый `test_roles.py`.
-- Docs: `architecture.md` (единый источник ролей), `decisions.md` (новый ADR),
-  `roles.md` (справочник → `BusinessRole`).
+- Docs: `architecture.md` (app зависит от db_mcp), `roles.md`.
 
 ### Этап A. Устойчивость и валидация (критичные)
 - `statement_timeout` (10 с по умолчанию, настройка в `Settings`) в начале
