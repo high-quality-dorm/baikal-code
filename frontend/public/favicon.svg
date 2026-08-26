@@ -1,5 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#0D9488"/>
-  <path d="M12 34c6-8 12-8 18 0s12 8 18 0" stroke="#F8FAFC" stroke-width="5" fill="none" stroke-linecap="round"/>
-  <path d="M12 45c6-8 12-8 18 0s12 8 18 0" stroke="#F8FAFC" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.55"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" class="g1" stop-color="#274686"/>
+      <stop offset="1" class="g2" stop-color="#3B82F6"/>
+    </linearGradient>
+    <style>
+      .mark { stroke: #ffffff; }
+      .g1 { stop-color: #274686; }
+      .g2 { stop-color: #3B82F6; }
+      @media (prefers-color-scheme: dark) {
+        .mark { stroke: #172554; }
+        .g1 { stop-color: #60A5FA; }
+        .g2 { stop-color: #93C5FD; }
+      }
+    </style>
+  </defs>
+  <rect width="64" height="64" rx="19" fill="url(#bg)"/>
+  <g transform="translate(14,14) scale(1.5)" class="mark" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2.5c3.8 4.3 6.3 7.2 6.3 10.2a6.3 6.3 0 0 1-12.6 0c0-3 2.5-5.9 6.3-10.2z"/>
+    <path d="M6.8 13.4c1.5-1.1 3-1.1 4.4 0 1.5 1.1 3 1.1 4.4 0" opacity="0.8"/>
+  </g>
 </svg>
