@@ -45,8 +45,10 @@ async def resolve_identity(pools: Pools, user_id: int | None) -> Identity | None
 async def resolve_role(pools: Pools, user_id: int) -> str | None:
     """Бизнес-роль пользователя (для приложения): student или должность staff.
 
-    Возвращает None, если учётка не найдена/неактивна или должность не является
-    известной бизнес-ролью (teacher/head/dean/admin).
+    Приоритет: известная должность (`teacher/head/dean/admin`) — выше, чем
+    `student`; пользователь с обоими id представляется сотрудником. Возвращает
+    None, если учётка не найдена/неактивна или должность не является известной
+    бизнес-ролью (тогда студент всё ещё может остаться студентом).
     """
     pool = await pools.service()
     async with pool.acquire() as conn:
@@ -62,9 +64,9 @@ async def resolve_role(pools: Pools, user_id: int) -> str | None:
         )
     if row is None or not row["is_active"]:
         return None
-    if row["student_id"] is not None:
-        return "student"
     position = row["position"]
     if position in _POSITION_ROLES:
         return position
+    if row["student_id"] is not None:
+        return "student"
     return None

@@ -120,7 +120,12 @@
 
 ---
 
-## Этап 3 — Исправить `resolve_role`: приоритет должности над student
+## Этап 3 — Исправить `resolve_role`: приоритет должности над student ✅ выполнено
+
+> Реализовано: в `resolve_role` (`packages/db/src/db/identity.py`) порядок
+> проверок изменён — известная должность (`teacher/head/dean/admin`) приоритетнее
+> `student`; неизвестная должность не маскирует студента (fallback). Тесты в
+> `tests/db/test_identity.py`. ADR 39.
 
 `packages/db/src/db/identity.py`, `resolve_role` (строки 65-70): сейчас первым
 идёт `if student_id is not None: return "student"`, что маскирует должность.

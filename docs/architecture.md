@@ -56,7 +56,8 @@ PostgreSQL (roles + set-based RLS)
   `students`/`marks`, общие таблицы открыты.
 - `identity.py` — резолюция identity: `users.id` → `Identity(student_id,
   staff_id, is_active)` через служебный пул `app_service`; `resolve_role` —
-  для app-уровня (student или должность из `staff.position`).
+  для app-уровня (известная должность из `staff.position` приоритетнее
+  `student`, см. ADR 39).
 - `validate.py` — валидация SQL (sqlglot): ровно один read-only запрос —
   SELECT или set-операция (UNION/INTERSECT/EXCEPT), запрет опасных функций
   (включая nextval/pg_advisory_*), запрет DML в любом узле дерева

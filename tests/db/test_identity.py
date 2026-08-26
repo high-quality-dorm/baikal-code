@@ -114,6 +114,26 @@ def test_resolve_role_student(monkeypatch: pytest.MonkeyPatch) -> None:
     assert asyncio.run(resolve_role(pools, 1)) == "student"
 
 
+def test_resolve_role_position_over_student(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Сотрудник-студент с известной должностью представляется должностью."""
+    conn = _FakeConn({"student_id": 7, "is_active": True, "position": "admin"})
+    pools = _make_pools(monkeypatch, conn)
+
+    assert asyncio.run(resolve_role(pools, 1)) == "admin"
+
+
+def test_resolve_role_unknown_position_falls_back_to_student(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Неизвестная должность не маскирует студента: fallback на student."""
+    conn = _FakeConn({"student_id": 7, "is_active": True, "position": "janitor"})
+    pools = _make_pools(monkeypatch, conn)
+
+    assert asyncio.run(resolve_role(pools, 1)) == "student"
+
+
 def test_resolve_role_position(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _FakeConn({"student_id": None, "is_active": True, "position": "dean"})
     pools = _make_pools(monkeypatch, conn)
