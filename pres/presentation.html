@@ -59,91 +59,80 @@
         </div>
       </section>
 
-      <section id="naive">
-        <div class="kicker">Почему не «просто LLM»</div>
-        <h2>Посадить LLM на базу — плохая идея</h2>
-        <div class="content">
-          <div class="fgrid" style="grid-template-columns: repeat(2, 1fr);">
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-robot"></i></div>
-              <h3>Уверенно выдумывает</h3>
-              <p>LLM придумает цифру — и будет звучать убедительно</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-eye-slash"></i></div>
-              <h3>Не видит ошибок</h3>
-              <p>Отправил запрос — и не узнает, выполнился ли он</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-user-shield"></i></div>
-              <h3>Не знает прав</h3>
-              <p>Не понимает, кому что можно видеть, а что — нет</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-lock"></i></div>
-              <h3>Чёрный ящик у данных</h3>
-              <p>Персональные данные нельзя доверить слепой модели</p>
-            </div>
-          </div>
-          <p class="punch">В университете это не «фича», а риск. <span class="hl">Поэтому мы сделали иначе.</span></p>
-        </div>
-      </section>
-
-      <section id="um-prava">
-        <div class="kicker">Наш ответ</div>
-        <h2>Мы разделили ум и права</h2>
+      <section id="solution">
+        <div class="kicker">Как решаем</div>
+        <h2>Спросили по-русски — помощник сделал остальное</h2>
         <div class="content">
           <div class="split">
-            <div class="col tint">
+            <div class="col">
               <div class="col-head">
-                <i class="fa-solid fa-brain"></i>
-                <span class="col-label">Агент · ум</span>
+                <i class="fa-solid fa-hourglass-half"></i>
+                <span class="col-label">Было</span>
               </div>
               <ul class="icon-list">
-                <li><i class="fa-solid fa-compass"></i><span>Сам решает, как ответить на вопрос</span></li>
-                <li><i class="fa-solid fa-terminal"></i><span>Пишет и запускает SQL через один инструмент</span></li>
-                <li><i class="fa-solid fa-rotate"></i><span>Видит ошибки шлюза — исправляет и повторяет</span></li>
-                <li><i class="fa-solid fa-comment"></i><span>Отвечает по-русски и объясняет, что сделал</span></li>
+                <li><i class="fa-solid fa-terminal"></i><span>Чтобы получить цифру — <strong>нужен SQL</strong></span></li>
+                <li><i class="fa-solid fa-file-lines"></i><span>Отчёты для руководства собирали <strong>вручную</strong></span></li>
+                <li><i class="fa-solid fa-clock"></i><span>Приёмная комиссия отвечала <strong>по одному и тому же</strong></span></li>
               </ul>
             </div>
-            <div class="col accent">
+            <div class="col tint">
               <div class="col-head">
-                <i class="fa-solid fa-shield-halved"></i>
-                <span class="col-label">Шлюз · права</span>
+                <i class="fa-solid fa-circle-check"></i>
+                <span class="col-label">Стало</span>
               </div>
               <ul class="icon-list">
-                <li><i class="fa-solid fa-lock"></i><span>Только read-only SELECT</span></li>
-                <li><i class="fa-solid fa-list-check"></i><span>Whitelist · авто-LIMIT 200 · statement_timeout</span></li>
-                <li><i class="fa-solid fa-user-shield"></i><span>RLS: данные открыты строго по правилам</span></li>
-                <li><i class="fa-solid fa-file-signature"></i><span>Каждый запрос — в аудит-логе</span></li>
+                <li><i class="fa-solid fa-comment-dots"></i><span>Вопрос <strong>по-русски</strong> — как человеку</span></li>
+                <li><i class="fa-solid fa-bolt"></i><span>Ответ <strong>за минуту</strong>: агент сам пишет SQL</span></li>
+                <li><i class="fa-solid fa-user-tag"></i><span><strong>Каждому — своё</strong>: права соблюдаются автоматически</span></li>
               </ul>
             </div>
           </div>
-          <p class="punch">Агент свободный — шлюз строгий. <span class="hl">Агент предлагает — шлюз решает.</span></p>
+          <p class="punch">Один помощник для всего университета — <span class="hl">от абитуриента до ректората.</span></p>
         </div>
       </section>
 
-      <section id="agent-work">
-        <div class="kicker">Посмотрите, как он работает</div>
-        <h2>Агент виден в действии</h2>
+      <section id="agent">
+        <div class="kicker">Агент</div>
+        <h2>Агент-помощник, а не конвейер</h2>
         <div class="content">
-          <div class="chat">
-            <div class="row user"><div class="bubble">Сколько студентов на факультете ИТ?</div></div>
-            <div class="row"><span class="status"><span class="dot"></span>Загружаю схему…</span></div>
-            <div class="row"><span class="status"><span class="dot"></span>Собираю данные…</span></div>
-            <div class="row"><span class="status"><span class="dot"></span>Запрос не выполнился, исправляю SQL…</span></div>
-            <div class="row"><span class="status"><span class="dot"></span>Собираю данные…</span></div>
-            <div class="row"><div class="sql">SELECT COUNT(*) FROM students s JOIN groups g ON s.group_id = g.id JOIN faculties f ON g.faculty_id = f.id WHERE f.name = 'ИТ'</div></div>
-            <div class="row agent"><div class="bubble">На факультете ИТ обучается 152 студента.</div></div>
-            <div class="row"><span class="explain-line">Объяснение запроса: students → groups → faculties · JOIN · COUNT(*)</span></div>
+          <div class="pipeline">
+            <div class="stage">
+              <div class="stage-title">Понял</div>
+              <div class="stage-sub">вопрос по-русски</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Написал SQL</div>
+              <div class="stage-sub">по схеме базы</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Выполнил</div>
+              <div class="stage-sub">через шлюз</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Увидел ошибку</div>
+              <div class="stage-sub">исправил и повторил</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage accent">
+              <div class="stage-title">Ответил</div>
+              <div class="stage-sub">и объяснил, что сделал</div>
+            </div>
           </div>
-          <p class="note">Всё это — в реальном времени, потоком: видна каждая мысль агента. Он не «угадывает» ответ — он его добывает и чинит то, что не получилось.</p>
+          <div class="pill-row">
+            <span class="pill">Стриминг: видна каждая мысль</span>
+            <span class="pill">Отвечает только по данным</span>
+            <span class="pill">Самокоррекция</span>
+          </div>
+          <p class="punch">Конвейер выдаёт ответ один раз. <span class="hl">Агент доводит его до конца.</span></p>
         </div>
       </section>
 
       <section id="roles">
-        <div class="kicker">Агент знает, кто спрашивает</div>
-        <h2>Один агент — для всех. Каждому — своё.</h2>
+        <div class="kicker">Ролевая модель</div>
+        <h2>Один помощник — разным людям разное</h2>
         <div class="content">
           <div class="fgrid" style="grid-template-columns: repeat(4, 1fr);">
             <div class="fcard">
@@ -167,34 +156,71 @@
               <p>Всё: динамика набора, отчёты, аудитории</p>
             </div>
           </div>
-          <div class="pill-row">
-            <span class="pill">Персональные данные студентов — только агрегаты или обезличенно</span>
-          </div>
-          <p class="punch">Права — не в чате, а в самой базе: <span class="hl">RLS решает, что агент увидит.</span> Он не может спросить то, что не положено.</p>
+          <p class="punch">Помощник сам понимает, кто перед ним: <span class="hl">каждый спрашивает о своём — и получает своё.</span></p>
         </div>
       </section>
 
-      <section id="honesty">
-        <div class="kicker">Ему можно верить</div>
-        <h2>Каждый ответ можно проверить</h2>
+      <section id="implementation">
+        <div class="kicker">Реализация</div>
+        <h2>Шлюз и мозг — два слоя</h2>
         <div class="content">
-          <div style="display:grid; grid-template-columns: 1fr 1.1fr; gap:22px;">
-            <div class="expl">
-              <div class="expl-title">Объяснение запроса</div>
-              <span class="muted">Таблицы</span> — students · groups · faculties<br>
-              <span class="muted">JOIN</span> — students → groups → faculties<br>
-              <span class="muted">Фильтры</span> — faculty.name = 'ИТ'<br>
-              <span class="muted">Агрегаты</span> — COUNT(*)<br>
-              <span class="muted">Лимит</span> — 1 строка
+          <div class="split">
+            <div class="col tint">
+              <div class="col-head">
+                <i class="fa-solid fa-brain"></i>
+                <span class="col-label">Мозг · агент</span>
+              </div>
+              <ul class="icon-list">
+                <li><i class="fa-solid fa-rotate"></i><span>LLM-цикл: думает, действует, исправляет</span></li>
+                <li><i class="fa-solid fa-wrench"></i><span>Тул <span class="mono">execute_query</span> — один инструмент</span></li>
+                <li><i class="fa-solid fa-user-tag"></i><span>Промпт под роль и PII-скоуп</span></li>
+                <li><i class="fa-solid fa-sliders"></i><span>Настраивается без кода: <span class="mono">.env</span>, шаги, лимиты</span></li>
+              </ul>
             </div>
-            <ul class="icon-list">
-              <li><i class="fa-solid fa-code"></i><span><strong>SQL раскрыт</strong> — открой запрос и проверь любую цифру</span></li>
-              <li><i class="fa-solid fa-table-list"></i><span><strong>Метаданные</strong>: строки · время · признак обрезки</span></li>
-              <li><i class="fa-solid fa-magnifying-glass-chart"></i><span><strong>Объяснение</strong>: таблицы, JOIN, фильтры, агрегаты</span></li>
-              <li><i class="fa-solid fa-circle-check"></i><span><strong>Только факты</strong> из базы — без выдуманных чисел</span></li>
-            </ul>
+            <div class="col accent">
+              <div class="col-head">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span class="col-label">Шлюз · db</span>
+              </div>
+              <ul class="icon-list">
+                <li><i class="fa-solid fa-lock"></i><span>Только read-only SELECT</span></li>
+                <li><i class="fa-solid fa-list-check"></i><span>Whitelist · авто-LIMIT 200 · statement_timeout</span></li>
+                <li><i class="fa-solid fa-user-shield"></i><span>RLS-контекст под роль пользователя</span></li>
+                <li><i class="fa-solid fa-file-signature"></i><span>Каждый запрос — в аудит-логе</span></li>
+              </ul>
+            </div>
           </div>
-          <p class="punch">В мире, где LLM уверенно выдумывают, <span class="hl">честность — это продукт.</span></p>
+          <p class="punch">Агент предлагает — <span class="hl">шлюз решает.</span> В базу напрямую приложение не ходит.</p>
+        </div>
+      </section>
+
+      <section id="security">
+        <div class="kicker">Безопасность</div>
+        <h2>Права — в самой базе, а не в чате</h2>
+        <div class="content">
+          <div class="fgrid" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-user-shield"></i></div>
+              <h3>RLS deny-by-default</h3>
+              <p>Строки открыты только по правилам — что не положено, база не отдаст</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-id-card"></i></div>
+              <h3>Роль из данных</h3>
+              <p>Выводится из <span class="mono">student_id</span> / <span class="mono">staff_id</span>, не хранится в коде</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-eye-slash"></i></div>
+              <h3>PII студентов — только агрегаты</h3>
+              <p>Численность и статистика — публичные вью, персональные данные — нет</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-file-signature"></i></div>
+              <h3>Аудит</h3>
+              <p>Каждый запрос фиксируется: кто, что, когда</p>
+            </div>
+          </div>
+          <p class="punch">Агент не может спросить то, что не положено, — <span class="hl">база просто не отдаст.</span></p>
         </div>
       </section>
 
@@ -224,14 +250,14 @@
               <p>199 тестов, RLS-матрица проверена на реальных данных</p>
             </div>
             <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-sliders"></i></div>
-              <h3>Настройка без кода</h3>
-              <p>Промпт, шаги агента, лимиты — в конфигурации, не в коде</p>
+              <div class="ficon"><i class="fa-solid fa-list-check"></i></div>
+              <h3>Аудит</h3>
+              <p>Каждый запрос — в <span class="mono">query_log</span>: кто, что, когда</p>
             </div>
             <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-layer-group"></i></div>
-              <h3>Растёт</h3>
-              <p>Тул-архитектура: execute_query — первый, новые инструменты добавляются модулями</p>
+              <div class="ficon"><i class="fa-solid fa-wave-square"></i></div>
+              <h3>Быстрый ответ</h3>
+              <p>NDJSON-стриминг: первый токен сразу, виден каждый шаг</p>
             </div>
           </div>
           <p class="note">За 5 дней: схема с ролями и RLS · шлюз · агент · чат · виджет · деплой</p>

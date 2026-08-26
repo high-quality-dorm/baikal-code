@@ -364,27 +364,6 @@
 .fcard.accent-bg h3, .fcard.accent-bg .ficon { color: #ffffff; }
 .fcard.accent-bg p { color: rgba(255, 255, 255, 0.85); }
 
-/* Explanation mock */
-.expl {
-  border: 1px solid var(--border);
-  border-radius: var(--box-radius);
-  background: #ffffff;
-  padding: 20px 24px;
-  font-family: var(--mono-font);
-  font-size: 12pt;
-  color: var(--text);
-  line-height: 1.95;
-}
-.expl .expl-title {
-  color: var(--accent);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 10pt;
-  margin-bottom: 10px;
-}
-.expl .muted { color: var(--muted); }
-
 /* Logo */
 .logo-badge {
   width: 58px;
@@ -423,56 +402,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-/* Chat transcript (agent at work) */
-.chat {
-  border: 1px solid var(--border);
-  border-radius: var(--box-radius);
-  background: #ffffff;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-.chat .row { display: flex; }
-.chat .row.user { justify-content: flex-end; }
-.chat .bubble {
-  max-width: 88%;
-  border-radius: 12px;
-  padding: 9px 15px;
-  font-size: 13pt;
-  line-height: 1.45;
-}
-.chat .row.user .bubble { background: var(--accent); color: #ffffff; }
-.chat .row.agent .bubble {
-  background: var(--accent-tint);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-.chat .status {
-  font-family: var(--mono-font);
-  font-size: 11pt;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.chat .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-.chat .sql {
-  font-family: var(--mono-font);
-  font-size: 11pt;
-  color: var(--text);
-  background: var(--accent-tint);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  line-height: 1.5;
-}
-.chat .explain-line {
-  font-family: var(--mono-font);
-  font-size: 10.5pt;
-  color: var(--muted);
 }
 
 /* Accent panel (split: ум/права) */
