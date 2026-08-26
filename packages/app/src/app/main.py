@@ -7,17 +7,17 @@ from contextlib import asynccontextmanager
 from db.gateway import Gateway
 from fastapi import FastAPI
 
+from app.agent.agent import Agent
 from app.api.ask import router as ask_router
 from app.auth.router import router as auth_router
 from app.context import AppContext, get_context
 from app.core.config import settings
 from app.llm import ChatLLM
 from app.services.auth import AuthService
-from app.services.pipeline import Pipeline
 
 
 def create_app() -> FastAPI:
-    """Создаёт приложение: общий Gateway + сервисы auth и pipeline.
+    """Создаёт приложение: общий Gateway + сервисы auth и агента.
 
     `get_context` переопределяется единожды — это единственный шов DI
     (в тестах подменяется фейковым контекстом).
@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     context = AppContext(
         gateway=gateway,
         auth=AuthService(gateway),
-        pipeline=Pipeline(gateway, ChatLLM(settings)),
+        agent=Agent(gateway, ChatLLM(settings), settings.agent_max_steps),
     )
 
     @asynccontextmanager

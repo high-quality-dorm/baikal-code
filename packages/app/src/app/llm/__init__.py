@@ -1,5 +1,5 @@
-"""LLM-клиент приложения: генерация SQL и пересказ результата."""
+"""LLM-клиент приложения: стриминговый вызов OpenAI-совместимого API."""
 
-from app.llm.llm import ChatLLM, LLMClient, LLMError
+from app.llm.llm import ChatLLM, LLMError
 
-__all__ = ["ChatLLM", "LLMClient", "LLMError"]
+__all__ = ["ChatLLM", "LLMError"]

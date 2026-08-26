@@ -13,8 +13,8 @@ from typing import Annotated
 from db.gateway import Gateway
 from fastapi import Depends
 
+from app.agent.agent import Agent
 from app.services.auth import AuthService
-from app.services.pipeline import Pipeline
 
 
 @dataclass
@@ -23,7 +23,7 @@ class AppContext:
 
     gateway: Gateway
     auth: AuthService
-    pipeline: Pipeline
+    agent: Agent
 
 
 def get_context() -> AppContext:

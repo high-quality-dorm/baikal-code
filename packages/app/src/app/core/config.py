@@ -26,5 +26,8 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_temperature: float = 0.0
 
+    # Тул-агент: максимум шагов LLM-цикла на вопрос (включая вызовы тулов).
+    agent_max_steps: int = 5
+
 
 settings = Settings()
