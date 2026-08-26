@@ -131,7 +131,7 @@ class Agent:
             ),
             HumanMessage(content=question),
         ]
-        executor = ToolExecutor(self._gateway, user_id)
+        executor = ToolExecutor(self._gateway, user_id, role or "guest")
         last_meta: QueryMeta | None = None
 
         try:

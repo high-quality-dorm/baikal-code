@@ -111,6 +111,50 @@ def test_execute_query_audits_user_id_as_users_id(
     assert recorded["role"] is None
 
 
+def test_execute_query_audits_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Переданная роль пишется в query_log.role (а не NULL)."""
+    gateway = Gateway(Settings())
+    recorded: dict[str, object] = {}
+
+    async def fake_record(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    gateway._auditor.record = fake_record  # type: ignore[method-assign]
+
+    @asynccontextmanager
+    async def fake_connection_for(_pools: object, identity: object):
+        yield _FakeConn([])
+
+    monkeypatch.setattr(gateway_module, "connection_for", fake_connection_for)
+
+    asyncio.run(gateway.execute_query("SELECT 1", 3, role="admin"))
+    assert recorded["role"] == "admin"
+
+
+def test_execute_query_audits_guest_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Гость аудируется с ролью 'guest' (приходит из приложения)."""
+    gateway = Gateway(Settings())
+    recorded: dict[str, object] = {}
+
+    async def fake_record(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    gateway._auditor.record = fake_record  # type: ignore[method-assign]
+
+    @asynccontextmanager
+    async def fake_connection_for(_pools: object, identity: object):
+        yield _FakeConn([])
+
+    monkeypatch.setattr(gateway_module, "connection_for", fake_connection_for)
+
+    asyncio.run(gateway.execute_query("SELECT 1", None, role="guest"))
+    assert recorded["role"] == "guest"
+
+
 def test_execute_query_guest_audits_no_user_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -43,11 +43,16 @@ class ToolResult:
 
 
 class ToolExecutor:
-    """Исполняет тулы с identity конкретного пользователя (RLS в шлюзе)."""
+    """Исполняет тулы с identity конкретного пользователя (RLS в шлюзе).
 
-    def __init__(self, gateway: Gateway, user_id: int | None) -> None:
+    role — бизнес-роль пользователя для журнала аудита (пишется в
+    query_log.role через шлюз).
+    """
+
+    def __init__(self, gateway: Gateway, user_id: int | None, role: str | None) -> None:
         self._gateway = gateway
         self._user_id = user_id
+        self._role = role
 
     async def run(self, name: str, args: object) -> ToolResult:
         """Выполняет тул по имени; ошибки возвращает текстом, а не бросает."""
@@ -60,7 +65,7 @@ class ToolExecutor:
             )
         sql = sql.strip()
         try:
-            result = await self._gateway.execute_query(sql, self._user_id)
+            result = await self._gateway.execute_query(sql, self._user_id, self._role)
         except GatewayError as exc:
             return ToolResult(content=f"Ошибка: {exc}")
         payload = {

@@ -54,7 +54,7 @@ class FakeGateway:
         self.gateway_error: Exception | None = None
         self.execute_failures: list[str] = []
         self.get_schema_calls: list[int | None] = []
-        self.execute_calls: list[tuple[str, int | None]] = []
+        self.execute_calls: list[tuple[str, int | None, str | None]] = []
 
     def add_user(
         self,
@@ -86,8 +86,10 @@ class FakeGateway:
         self.get_schema_calls.append(user_id)
         return self.schema
 
-    async def execute_query(self, sql: str, user_id: int | None) -> QueryResult:
-        self.execute_calls.append((sql, user_id))
+    async def execute_query(
+        self, sql: str, user_id: int | None, role: str | None = None
+    ) -> QueryResult:
+        self.execute_calls.append((sql, user_id, role))
         if sql in self.execute_failures:
             raise GatewayError("Разрешены только read-only запросы")
         if self.gateway_error is not None:

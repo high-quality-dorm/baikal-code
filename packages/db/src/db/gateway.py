@@ -4,10 +4,11 @@
 валидацию, исполнение с RLS-контекстом и аудит. Приложение не ходит в базу
 напрямую — только через этот фасад.
 
-Роль строкой нигде не передаётся: `get_schema`/`execute_query` принимают только
-`user_id` (номер учётки users.id), а скоуп выводится из student_id/staff_id
-пользователя (RLS в БД). `resolve_role` — отдельная функция для app-уровня
-(логин, require_role).
+`get_schema`/`execute_query` принимают `user_id` (номер учётки users.id), а скоуп
+выводится из student_id/staff_id пользователя (RLS в БД). Бизнес-роль строкой
+используется только для аудита (`execute_query(..., role=)`) — она приходит из
+приложения, не резолвится в шлюзе заново. `resolve_role` — отдельная функция для
+app-уровня (логин, require_role).
 """
 
 from __future__ import annotations
@@ -61,11 +62,14 @@ class Gateway:
         tables = await self._schema.describe(identity)
         return SchemaDescription(identity=identity, tables=tables)
 
-    async def execute_query(self, sql: str, user_id: int | None) -> QueryResult:
+    async def execute_query(
+        self, sql: str, user_id: int | None, role: str | None = None
+    ) -> QueryResult:
         """Валидировать, исполнить с RLS-контекстом и зааудитировать запрос.
 
-        user_id — номер учётки (users.id) или None для гостя. Роль не передаётся:
-        скоуп выводится из student_id/staff_id пользователя политиками RLS.
+        user_id — номер учётки (users.id) или None для гостя. Скоуп выводится из
+        student_id/staff_id пользователя политиками RLS. role — бизнес-роль для
+        журнала аудита (пишется в query_log.role); приходит из приложения.
         """
         started = time.perf_counter()
         error: str | None = None
@@ -85,7 +89,7 @@ class Gateway:
         finally:
             duration_ms = (time.perf_counter() - started) * 1000
             await self._auditor.record(
-                role=None,
+                role=role,
                 user_id=None if user_id is None else str(user_id),
                 sql_query=sql,
                 status="error" if error else "ok",

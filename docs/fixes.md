@@ -154,7 +154,14 @@
 
 ---
 
-## Этап 4 — Исправить аудит: писать реальную роль
+## Этап 4 — Исправить аудит: писать реальную роль ✅ выполнено
+
+> Реализовано: `Gateway.execute_query(sql, user_id, role=None)` пишет роль в
+> `query_log.role`; роль прокидывается из приложения: `Agent.stream` →
+> `ToolExecutor(gateway, user_id, role or "guest")`; гость → `"guest"` вместо
+> `NULL`. Аудит не роняет основной запрос (ошибка проглатывается). Тесты в
+> `tests/db/test_gateway.py`, `tests/services/test_agent.py`, `tests/fakes.py`.
+> ADR 16 уточнена.
 
 Сейчас `gateway.py:88` передаёт `role=None` в аудит независимо от пользователя.
 

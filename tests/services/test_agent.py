@@ -178,7 +178,7 @@ async def test_tool_then_answer_streams_events():
         "truncated": False,
         "duration_ms": 3.5,
     }
-    assert gw.execute_calls == [("SELECT COUNT(*) FROM faculties;", 1)]
+    assert gw.execute_calls == [("SELECT COUNT(*) FROM faculties;", 1, "student")]
     assert llm.calls == 2
 
 
@@ -216,7 +216,7 @@ async def test_guest_uses_none_user_id():
     events = await _events(agent, user_id=None, role=None, can_see_pii=False)
 
     assert _types(events)[-1] == "done"
-    assert gw.execute_calls == [("SELECT COUNT(*) FROM faculties;", None)]
+    assert gw.execute_calls == [("SELECT COUNT(*) FROM faculties;", None, "guest")]
 
 
 @pytest.mark.anyio
@@ -294,7 +294,7 @@ async def test_unresolved_max_steps_is_error():
 @pytest.mark.anyio
 async def test_executor_success_returns_json_and_meta():
     gw = _gateway()
-    executor = ToolExecutor(gw, 7)
+    executor = ToolExecutor(gw, 7, "student")
 
     result = await executor.run("execute_query", {"sql": "SELECT COUNT(*) FROM faculties;"})
 
@@ -313,7 +313,7 @@ async def test_executor_success_returns_json_and_meta():
 async def test_executor_gateway_error_returns_text():
     gw = _gateway()
     gw.execute_failures = ["SELECT bad"]
-    executor = ToolExecutor(gw, 7)
+    executor = ToolExecutor(gw, 7, "student")
 
     result = await executor.run("execute_query", {"sql": "SELECT bad"})
 
@@ -323,7 +323,7 @@ async def test_executor_gateway_error_returns_text():
 
 @pytest.mark.anyio
 async def test_executor_unknown_tool():
-    executor = ToolExecutor(_gateway(), 7)
+    executor = ToolExecutor(_gateway(), 7, "student")
 
     result = await executor.run("nope", {})
 
@@ -333,7 +333,7 @@ async def test_executor_unknown_tool():
 
 @pytest.mark.anyio
 async def test_executor_invalid_sql_argument():
-    executor = ToolExecutor(_gateway(), 7)
+    executor = ToolExecutor(_gateway(), 7, "student")
 
     assert (await executor.run("execute_query", {})).content.startswith("Ошибка")
     assert (await executor.run("execute_query", {"sql": "  "})).content.startswith("Ошибка")
