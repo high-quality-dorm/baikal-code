@@ -9,6 +9,7 @@ import "./styles/base.css";
 import "./styles/components.css";
 import "./styles/pages.css";
 import "./styles/chat.css";
+import "./styles/widget.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
