@@ -19,52 +19,52 @@ import {
 const STEPS = [
   {
     icon: IconSparkles,
-    title: "Сформулируйте вопрос",
-    text: "Опишите, что хотите узнать, простыми словами. Без SQL.",
+    title: "Задайте вопрос",
+    text: "Напишите своими словами, что хотите узнать. Например: «Сколько бюджетных мест в этом году?»",
   },
   {
     icon: IconDatabase,
-    title: "Baikal строит запрос",
-    text: "Генерирует SQL по схеме, маскированной под вашу роль.",
-  },
-  {
-    icon: IconShield,
-    title: "Запрос проходит проверку",
-    text: "Валидируется и исполняется только через защищённый шлюз.",
+    title: "Получите понятный ответ",
+    text: "Baikal находит нужные данные и отвечает простым языком — с источником для проверки.",
   },
   {
     icon: IconClipboard,
-    title: "Вы получаете ответ",
-    text: "Понятный результат с метаданными. Запрос попадает в журнал аудита.",
+    title: "Уточняйте, если нужно",
+    text: "Продолжайте диалог: сравнивайте, уточняйте и задавайте новые вопросы.",
   },
 ];
 
 const FEATURES = [
   {
-    icon: IconShield,
-    title: "Единственный шлюз к базе",
-    text: "Приложение никогда не обращается к базе напрямую. Весь доступ идёт через безопасный шлюз db_mcp.",
+    icon: IconSparkles,
+    title: "Вопросы простыми словами",
+    text: "Никаких сложных запросов: сформулируйте вопрос как в разговоре — Baikal сам найдёт ответ в данных университета.",
     featured: true,
   },
   {
     icon: IconLock,
-    title: "Роли и row-level security",
-    text: "Каждая роль видит только свои данные. Студент свою успеваемость, преподаватель свои курсы.",
-  },
-  {
-    icon: IconDatabase,
     title: "Личные данные защищены",
     text: "Персональные данные студентов недоступны. Ответы обезличенные или агрегированные.",
   },
   {
+    icon: IconUsers,
+    title: "Каждый видит только своё",
+    text: "Студент — свою успеваемость, преподаватель — свои курсы, администрация — сводные данные.",
+  },
+  {
     icon: IconClipboard,
-    title: "Полный аудит запросов",
-    text: "Каждый запрос фиксируется в журнале. Всегда понятно, кто и что спрашивал.",
+    title: "Ответ можно проверить",
+    text: "Раскройте детали ответа и посмотрите, на чём основан результат.",
   },
   {
     icon: IconGauge,
-    title: "Быстрые и стабильные ответы",
-    text: "Валидация, маскирование схемы и гарантированный лимит строк.",
+    title: "Быстрые ответы",
+    text: "От вопроса до ответа — секунды, без ожидания отчётов и выгрузок.",
+  },
+  {
+    icon: IconShield,
+    title: "Можно начать без входа",
+    text: "Гостю открыты общие данные: направления подготовки, места, статистика приёма.",
   },
 ];
 
@@ -126,7 +126,7 @@ export default function Landing() {
             <Reveal>
               <span className="hero__badge">
                 <IconSparkles width={15} height={15} />
-                Безопасный text-to-SQL
+                Ответы о данных университета
               </span>
             </Reveal>
             <Reveal delay={80}>
@@ -136,8 +136,9 @@ export default function Landing() {
             </Reveal>
             <Reveal delay={160}>
               <p className="hero__subtitle">
-                Baikal превращает вопрос в проверенный SQL и возвращает понятный
-                ответ. С ролями, защитой личных данных и аудитом.
+                Напишите вопрос обычными словами — и получите понятный ответ
+                о направлениях, баллах, местах и успеваемости. Личные данные
+                защищены.
               </p>
             </Reveal>
             <Reveal delay={240}>
@@ -162,10 +163,6 @@ export default function Landing() {
                 <div className="hero-demo__answer">
                   В университете обучается <strong>500</strong> студентов на{" "}
                   <strong>26</strong> направлениях подготовки.
-                  <div className="hero-demo__meta">
-                    <span>SQL: <code>SELECT COUNT(*) FROM students</code></span>
-                    <span>1 строка, 420 ms</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -176,10 +173,9 @@ export default function Landing() {
       <section className="section" id="how-it-works">
         <div className="container">
           <Reveal className="section__head">
-            <h2 className="section__title">От вопроса до ответа</h2>
+            <h2 className="section__title">Как это работает</h2>
             <p className="section__desc">
-              Четыре шага конвейера, которые приоритизируют корректность и
-              безопасность.
+              Три простых шага — и вы получите нужный ответ.
             </p>
           </Reveal>
           <ol className="steps">
@@ -201,10 +197,9 @@ export default function Landing() {
       <section className="section section--tinted" id="features">
         <div className="container">
           <Reveal className="section__head">
-            <h2 className="section__title">Безопасно, прозрачно, для всех</h2>
+            <h2 className="section__title">Возможности</h2>
             <p className="section__desc">
-              Можно начать без входа. Гостю доступны общие агрегированные
-              данные.
+              Всё нужное, чтобы быстро получать ответы о данных университета.
             </p>
           </Reveal>
           <div className="features">
