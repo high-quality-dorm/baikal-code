@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import itertools
 import random
 from dataclasses import dataclass, field
 from datetime import date
@@ -255,8 +256,50 @@ class SeedContext:
     campaign_by_year: dict[int, int] = field(default_factory=dict)
 
 
+# Размер пачки для batch-вставки. Пачки убирают сетевые round-trip'ы: на
+# удалённой БД (~75 мс/statement) поодиночная вставка ~20k строк занимала бы
+# десятки минут, пачками — единицы секунд.
+BATCH_SIZE = 500
+
+
+async def _insert_rows(
+    conn: asyncpg.Connection, base_sql: str, rows: list[tuple], batch: int = BATCH_SIZE
+) -> list[int]:
+    """Пакетная INSERT ... RETURNING id (multi-row VALUES).
+
+    `base_sql` — INSERT без `VALUES` (например "INSERT INTO students (a, b)").
+    id возвращаются в том же порядке, что и строки в `rows`.
+    """
+    ids: list[int] = []
+    if not rows:
+        return ids
+    cols = len(rows[0])
+    for i in range(0, len(rows), batch):
+        chunk = rows[i : i + batch]
+        counter = itertools.count(1)
+        placeholders = ",".join(
+            "(" + ",".join(f"${next(counter)}" for _ in range(cols)) + ")"
+            for _ in chunk
+        )
+        flat = [v for row in chunk for v in row]
+        recs = await conn.fetch(f"{base_sql} VALUES {placeholders} RETURNING id", *flat)
+        ids.extend(r["id"] for r in recs)
+    return ids
+
+
+async def _exec_many(
+    conn: asyncpg.Connection, base_sql: str, rows: list[tuple], batch: int = BATCH_SIZE
+) -> None:
+    """Пакетная вставка без необходимости получать id (executemany)."""
+    if not rows:
+        return
+    for i in range(0, len(rows), batch):
+        await conn.executemany(base_sql, rows[i : i + batch])
+
+
 async def seed_terms(ctx: SeedContext) -> None:
     """Семестры: осень (year, 1) и весна (year, 2), до «текущего» включительно."""
+    rows = []
     for year in ADMISSION_YEARS:
         for sem, start, end in (
             (1, date(year, 9, 1), date(year, 12, 31)),
@@ -264,164 +307,180 @@ async def seed_terms(ctx: SeedContext) -> None:
         ):
             if (year, sem) > (REFERENCE_YEAR, REFERENCE_SEMESTER):
                 continue
-            tid = await ctx.conn.fetchval(
-                "INSERT INTO terms (year, semester, date_start, date_end) "
-                "VALUES ($1, $2, $3, $4) RETURNING id",
-                year,
-                sem,
-                start,
-                end,
-            )
-            ctx.term_by_key[(year, sem)] = tid
+            rows.append((year, sem, start, end))
+    ids = await _insert_rows(
+        ctx.conn, "INSERT INTO terms (year, semester, date_start, date_end)", rows
+    )
+    for (year, sem, _s, _e), tid in zip(rows, ids):
+        ctx.term_by_key[(year, sem)] = tid
 
 
 async def seed_positions_statuses(ctx: SeedContext) -> None:
     """Справочники должностей и статусов студентов."""
-    for title in POSITIONS:
-        ctx.position_ids[title] = await ctx.conn.fetchval(
-            "INSERT INTO positions (title) VALUES ($1) RETURNING id", title
-        )
-    for title, is_studying in STUDENT_STATUSES:
-        ctx.status_ids[title] = await ctx.conn.fetchval(
-            "INSERT INTO student_statuses (title, is_studying) VALUES ($1, $2) RETURNING id",
-            title,
-            is_studying,
-        )
+    pids = await _insert_rows(
+        ctx.conn, "INSERT INTO positions (title)", [(t,) for t in POSITIONS]
+    )
+    ctx.position_ids = dict(zip(POSITIONS, pids))
+
+    titles = [t for t, _ in STUDENT_STATUSES]
+    sids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO student_statuses (title, is_studying)",
+        list(STUDENT_STATUSES),
+    )
+    ctx.status_ids = dict(zip(titles, sids))
 
 
 async def seed_faculties_departments(ctx: SeedContext) -> None:
     """Факультеты и кафедры (по 2-3 на факультет)."""
+    fids = await _insert_rows(
+        ctx.conn, "INSERT INTO faculties (title)", [(n,) for n, _ in FACULTIES]
+    )
+    ctx.faculty_ids = dict(zip([n for n, _ in FACULTIES], fids))
+    ctx.dept_by_faculty = {n: [] for n, _ in FACULTIES}
+
+    d_rows, d_meta = [], []
     for name, _title in FACULTIES:
-        fid = await ctx.conn.fetchval(
-            "INSERT INTO faculties (title) VALUES ($1) RETURNING id", name
-        )
-        ctx.faculty_ids[name] = fid
-        ctx.dept_by_faculty[name] = []
         for i in range(ctx.rng.randint(2, 3)):
-            did = await ctx.conn.fetchval(
-                "INSERT INTO departments (title, faculty_id) VALUES ($1, $2) RETURNING id",
-                f"{name} — кафедра №{i + 1}",
-                fid,
-            )
-            ctx.dept_ids.append(did)
-            ctx.dept_by_faculty[name].append(did)
+            d_rows.append((f"{name} — кафедра №{i + 1}", ctx.faculty_ids[name]))
+            d_meta.append(name)
+    dids = await _insert_rows(
+        ctx.conn, "INSERT INTO departments (title, faculty_id)", d_rows
+    )
+    ctx.dept_ids = list(dids)
+    for name, did in zip(d_meta, dids):
+        ctx.dept_by_faculty[name].append(did)
 
 
 async def seed_specializations_groups(ctx: SeedContext) -> None:
     """Направления подготовки и группы (по одной на направление на год набора)."""
-    for name, fid in ctx.faculty_ids.items():
+    s_rows = [
+        (fid, code, SPECIALTY_TITLES.get(code, f"{name} — {code}"))
+        for name, fid in ctx.faculty_ids.items()
+        for code in SPECIALTY_CODES[name]
+    ]
+    sids = await _insert_rows(
+        ctx.conn, "INSERT INTO specializations (faculty_id, code, title)", s_rows
+    )
+    ctx.spec_ids = list(sids)
+    idx = 0
+    for name in ctx.faculty_ids:
         for code in SPECIALTY_CODES[name]:
-            title = SPECIALTY_TITLES.get(code, f"{name} — {code}")
-            sid = await ctx.conn.fetchval(
-                "INSERT INTO specializations (faculty_id, code, title) "
-                "VALUES ($1, $2, $3) RETURNING id",
-                fid,
-                code,
-                title,
-            )
-            ctx.spec_ids.append(sid)
+            sid = sids[idx]
+            idx += 1
             ctx.spec_by_code[code] = sid
             ctx.spec_faculty[sid] = name
 
     group_num = 1
+    g_rows, g_meta = [], []
     for code, sid in ctx.spec_by_code.items():
         for year in ADMISSION_YEARS:
             title = f"{code.split('.')[1]}-{str(year)[2:]}-{group_num}"
-            gid = await ctx.conn.fetchval(
-                "INSERT INTO groups (specialization_id, title, admission_year) "
-                "VALUES ($1, $2, $3) RETURNING id",
-                sid,
-                title,
-                year,
-            )
-            ctx.group_ids.append(gid)
-            ctx.group_by_spec_year[(sid, year)] = gid
-            ctx.group_meta[gid] = (code, sid, year)
+            g_rows.append((sid, title, year))
+            g_meta.append((code, sid, year))
             group_num += 1
-
-
-async def _staff(
-    ctx: SeedContext, position: str, faculty_name: str | None, dept_id: int | None
-) -> int:
-    """Создать сотрудника; вернуть его id (ФИО генерируется faker'ом)."""
-    pid = ctx.position_ids[position]
-    fid = ctx.faculty_ids[faculty_name] if faculty_name else None
-    sid = await ctx.conn.fetchval(
-        "INSERT INTO staff (faculty_id, department_id, position_id, name, surname, patronymic) "
-        "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-        fid,
-        dept_id,
-        pid,
-        ctx.faker.first_name(),
-        ctx.faker.last_name(),
-        ctx.faker.middle_name(),
+    gids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO groups (specialization_id, title, admission_year)",
+        g_rows,
     )
-    ctx.staff_ids.append(sid)
-    if position == "admin":
-        ctx.admin_ids.append(sid)
-    if faculty_name:
-        ctx.staff_by_faculty.setdefault(faculty_name, []).append(sid)
-    return sid
+    ctx.group_ids = list(gids)
+    for (code, sid, year), gid in zip(g_meta, gids):
+        ctx.group_by_spec_year[(sid, year)] = gid
+        ctx.group_meta[gid] = (code, sid, year)
 
 
 async def seed_staff(ctx: SeedContext) -> None:
     """Ректор, деканы, зав. кафедрами, преподаватели и администрация."""
-    await _staff(ctx, "admin", None, None)  # ректор
-
-    for name, fid in ctx.faculty_ids.items():
-        dean = await _staff(ctx, "dean", name, None)
-        ctx.dean_by_faculty[name] = dean
-        await ctx.conn.execute(
-            "UPDATE faculties SET dean_id = $1 WHERE id = $2", dean, fid
-        )
-
+    plan: list[tuple[str, str | None, int | None]] = [("admin", None, None)]  # ректор
+    for name in ctx.faculty_ids:
+        plan.append(("dean", name, None))
         for dept_id in ctx.dept_by_faculty[name]:
-            head = await _staff(ctx, "head", name, dept_id)
-            ctx.head_by_dept[dept_id] = head
-            await ctx.conn.execute(
-                "UPDATE departments SET head_id = $1 WHERE id = $2", head, dept_id
-            )
+            plan.append(("head", name, dept_id))
             for _ in range(ctx.rng.randint(6, 10)):
-                teacher = await _staff(ctx, "teacher", name, dept_id)
-                ctx.teacher_ids.append(teacher)
-                ctx.teachers_by_dept.setdefault(dept_id, []).append(teacher)
-
+                plan.append(("teacher", name, dept_id))
         for _ in range(ctx.rng.randint(1, 2)):
-            await _staff(ctx, "admin", name, None)
+            plan.append(("admin", name, None))
+
+    rows = [
+        (
+            ctx.faculty_ids[fn] if fn else None,
+            dept_id,
+            ctx.position_ids[pos],
+            ctx.faker.first_name(),
+            ctx.faker.last_name(),
+            ctx.faker.middle_name(),
+        )
+        for pos, fn, dept_id in plan
+    ]
+    ids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO staff (faculty_id, department_id, position_id, name, surname, patronymic)",
+        rows,
+    )
+    ctx.staff_ids = list(ids)
+
+    for sid, (pos, fn, dept_id) in zip(ids, plan):
+        if pos == "admin":
+            ctx.admin_ids.append(sid)
+        if fn:
+            ctx.staff_by_faculty.setdefault(fn, []).append(sid)
+        if pos == "teacher":
+            ctx.teacher_ids.append(sid)
+            ctx.teachers_by_dept.setdefault(dept_id, []).append(sid)
+        elif pos == "dean":
+            ctx.dean_by_faculty[fn] = sid
+            await ctx.conn.execute(
+                "UPDATE faculties SET dean_id = $1 WHERE id = $2",
+                sid,
+                ctx.faculty_ids[fn],
+            )
+        elif pos == "head":
+            ctx.head_by_dept[dept_id] = sid
+            await ctx.conn.execute(
+                "UPDATE departments SET head_id = $1 WHERE id = $2", sid, dept_id
+            )
 
 
 async def seed_subjects(ctx: SeedContext) -> None:
     """Дисциплины по учебному плану; распределены по кафедрам факультета."""
+    rows, meta = [], []
     for name in ctx.faculty_ids:
         depts = ctx.dept_by_faculty[name]
         for sem in range(1, TOTAL_SEMESTERS + 1):
             for title in CURRICULUM[name].get(sem, []):
                 dept = depts[(sem - 1) % len(depts)]
-                sid = await ctx.conn.fetchval(
-                    "INSERT INTO subjects (title, department_id) VALUES ($1, $2) RETURNING id",
-                    title,
-                    dept,
-                )
-                ctx.subject_by_key[(name, sem, title)] = sid
-                ctx.subject_dept_by_key[(name, sem, title)] = dept
+                rows.append((title, dept))
+                meta.append((name, sem, title, dept))
+    ids = await _insert_rows(
+        ctx.conn, "INSERT INTO subjects (title, department_id)", rows
+    )
+    for (name, sem, title, dept), sid in zip(meta, ids):
+        ctx.subject_by_key[(name, sem, title)] = sid
+        ctx.subject_dept_by_key[(name, sem, title)] = dept
 
 
 async def seed_rooms(ctx: SeedContext) -> None:
     """Здания и аудитории."""
+    bids = await _insert_rows(
+        ctx.conn, "INSERT INTO buildings (title)", [(b,) for b in BUILDINGS]
+    )
+    bmap = dict(zip(BUILDINGS, bids))
+    rows = []
     for b in BUILDINGS:
-        bid = await ctx.conn.fetchval(
-            "INSERT INTO buildings (title) VALUES ($1) RETURNING id", b
-        )
         for floor in range(1, 6):
             for num in range(1, 8):
-                rid = await ctx.conn.fetchval(
-                    "INSERT INTO classrooms (building_id, number, capacity) "
-                    "VALUES ($1, $2, $3) RETURNING id",
-                    bid,
-                    f"{floor}{num:02d}",
-                    ctx.rng.choice([20, 25, 30, 40, 50, 80, 100]),
+                rows.append(
+                    (
+                        bmap[b],
+                        f"{floor}{num:02d}",
+                        ctx.rng.choice([20, 25, 30, 40, 50, 80, 100]),
+                    )
                 )
-                ctx.room_ids.append(rid)
+    cids = await _insert_rows(
+        ctx.conn, "INSERT INTO classrooms (building_id, number, capacity)", rows
+    )
+    ctx.room_ids = list(cids)
 
 
 def _current_sem(ctx: SeedContext, admission_year: int) -> int:
@@ -443,6 +502,7 @@ async def seed_students(ctx: SeedContext) -> None:
     created = 0
     attempts = 0
     max_attempts = target * 100
+    rows, meta = [], []
     while created < target and attempts < max_attempts:
         attempts += 1
         spec = ctx.rng.choice(ctx.spec_ids)
@@ -459,24 +519,32 @@ async def seed_students(ctx: SeedContext) -> None:
             status = "Академический отпуск"
         else:
             status = "Обучается"
-        sid = await ctx.conn.fetchval(
-            "INSERT INTO students (group_id, status_id, admission_year, name, surname, patronymic) "
-            "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            gid,
-            ctx.status_ids[status],
-            year,
-            ctx.faker.first_name(),
-            ctx.faker.last_name(),
-            ctx.faker.middle_name(),
+        rows.append(
+            (
+                gid,
+                ctx.status_ids[status],
+                year,
+                ctx.faker.first_name(),
+                ctx.faker.last_name(),
+                ctx.faker.middle_name(),
+            )
         )
-        ctx.student_ids.append(sid)
-        ctx.student_meta[sid] = (gid, spec, year, status)
+        meta.append((gid, spec, year, status))
         created += 1
+
+    ids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO students (group_id, status_id, admission_year, name, surname, patronymic)",
+        rows,
+    )
+    ctx.student_ids = list(ids)
+    for sid, m in zip(ids, meta):
+        ctx.student_meta[sid] = m
 
 
 async def seed_lessons(ctx: SeedContext) -> None:
     """Занятия для каждой группы по всем пройденным семестрам."""
-    slots = 0
+    l_rows, l_meta = [], []
     for gid in ctx.group_ids:
         _code, spec_id, year = ctx.group_meta[gid]
         fac = ctx.spec_faculty[spec_id]
@@ -491,32 +559,28 @@ async def seed_lessons(ctx: SeedContext) -> None:
                 if teacher is None:
                     continue
                 room = ctx.rng.choice(ctx.room_ids)
-                lid = await ctx.conn.fetchval(
-                    "INSERT INTO lessons (subject_id, classroom_id, teacher_id, term_id, weekday, period) "
-                    "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-                    subj,
-                    room,
-                    teacher,
-                    term_id,
-                    weekday,
-                    period,
-                )
-                await ctx.conn.execute(
-                    "INSERT INTO lesson_group (lesson_id, group_id) VALUES ($1, $2)",
-                    lid,
-                    gid,
-                )
-                slots += 1
+                l_rows.append((subj, room, teacher, term_id, weekday, period))
+                l_meta.append(gid)
                 period += 1
                 if period > 5:
                     period = 1
                     weekday += 1
-    print(f"lessons: {slots}")
+    lids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO lessons (subject_id, classroom_id, teacher_id, term_id, weekday, period)",
+        l_rows,
+    )
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO lesson_group (lesson_id, group_id) VALUES ($1, $2)",
+        [(lid, gid) for lid, gid in zip(lids, l_meta)],
+    )
+    print(f"lessons: {len(lids)}")
 
 
 async def seed_marks(ctx: SeedContext) -> None:
     """Успеваемость по всем пройденным семестрам (5-балльная шкала)."""
-    total = 0
+    rows = []
     for sid, (_gid, spec_id, year, _status) in ctx.student_meta.items():
         fac = ctx.spec_faculty[spec_id]
         for n in range(1, _current_sem(ctx, year) + 1):
@@ -529,80 +593,87 @@ async def seed_marks(ctx: SeedContext) -> None:
                 else:
                     grade = ctx.rng.choice([3, 3.5, 4, 4, 4.5, 5])
                     has_debt = False
-                await ctx.conn.execute(
-                    "INSERT INTO marks (student_id, subject_id, term_id, grade, has_debt) "
-                    "VALUES ($1, $2, $3, $4, $5)",
-                    sid,
-                    subj,
-                    term_id,
-                    grade,
-                    has_debt,
-                )
-                total += 1
-    print(f"marks: {total}")
+                rows.append((sid, subj, term_id, grade, has_debt))
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO marks (student_id, subject_id, term_id, grade, has_debt) "
+        "VALUES ($1, $2, $3, $4, $5)",
+        rows,
+    )
+    print(f"marks: {len(rows)}")
 
 
 async def seed_admission(ctx: SeedContext) -> None:
     """Приёмные кампании, комиссии, планы и статистика приёма."""
+    cids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO admission_campaigns (year)",
+        [(y,) for y in ADMISSION_YEARS],
+    )
+    ctx.campaign_by_year = dict(zip(ADMISSION_YEARS, cids))
+
+    com_rows, com_meta = [], []
     for year in ADMISSION_YEARS:
-        cid = await ctx.conn.fetchval(
-            "INSERT INTO admission_campaigns (year) VALUES ($1) RETURNING id", year
-        )
-        ctx.campaign_by_year[year] = cid
-
+        cid = ctx.campaign_by_year[year]
         for name, fid in ctx.faculty_ids.items():
-            dean = ctx.dean_by_faculty[name]
-            comid = await ctx.conn.fetchval(
-                "INSERT INTO admission_committees "
-                "(campaign_id, faculty_id, head_staff_id, location, phone, email, working_hours) "
-                "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-                cid,
-                fid,
-                dean,
-                f"Корпус А, {name}",
-                f"+7 (495) 000-{year % 100:02d}",
-                f"priem{year}@university.ru",
-                "Пн-Пт 10:00-17:00",
-            )
-            candidates = ctx.staff_by_faculty.get(name, [])
-            for staff_id in ctx.rng.sample(
-                candidates, min(ctx.rng.randint(2, 3), len(candidates))
-            ):
-                await ctx.conn.execute(
-                    "INSERT INTO admission_committee_members (committee_id, staff_id) "
-                    "VALUES ($1, $2)",
-                    comid,
-                    staff_id,
+            com_rows.append(
+                (
+                    cid,
+                    fid,
+                    ctx.dean_by_faculty[name],
+                    f"Корпус А, {name}",
+                    f"+7 (495) 000-{year % 100:02d}",
+                    f"priem{year}@university.ru",
+                    "Пн-Пт 10:00-17:00",
                 )
+            )
+            com_meta.append((cid, name))
+    com_ids = await _insert_rows(
+        ctx.conn,
+        "INSERT INTO admission_committees "
+        "(campaign_id, faculty_id, head_staff_id, location, phone, email, working_hours)",
+        com_rows,
+    )
 
+    mem_rows = []
+    for (cid, name), comid in zip(com_meta, com_ids):
+        candidates = ctx.staff_by_faculty.get(name, [])
+        for staff_id in ctx.rng.sample(
+            candidates, min(ctx.rng.randint(2, 3), len(candidates))
+        ):
+            mem_rows.append((comid, staff_id))
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO admission_committee_members (committee_id, staff_id) VALUES ($1, $2)",
+        mem_rows,
+    )
+
+    plan_rows, stat_rows = [], []
+    for year in ADMISSION_YEARS:
+        cid = ctx.campaign_by_year[year]
         for spec in ctx.spec_ids:
             budget = ctx.rng.randint(15, 60)
             paid = ctx.rng.randint(10, 40)
-            await ctx.conn.execute(
-                "INSERT INTO admission_plans "
-                "(campaign_id, specialization_id, budget_places, paid_places, application_deadline) "
-                "VALUES ($1, $2, $3, $4, $5)",
-                cid,
-                spec,
-                budget,
-                paid,
-                date(year, 7, 25),
-            )
+            plan_rows.append((cid, spec, budget, paid, date(year, 7, 25)))
             applications = budget + paid + ctx.rng.randint(20, 120)
             enrolled = budget + paid
             passing = round(ctx.rng.uniform(3.5, 4.8), 2)
             avg = round(min(5.0, max(0.0, passing + ctx.rng.uniform(-0.3, 0.3))), 2)
-            await ctx.conn.execute(
-                "INSERT INTO admission_stats "
-                "(campaign_id, specialization_id, applications, enrolled, passing_score, avg_score) "
-                "VALUES ($1, $2, $3, $4, $5, $6)",
-                cid,
-                spec,
-                applications,
-                enrolled,
-                passing,
-                avg,
-            )
+            stat_rows.append((cid, spec, applications, enrolled, passing, avg))
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO admission_plans "
+        "(campaign_id, specialization_id, budget_places, paid_places, application_deadline) "
+        "VALUES ($1, $2, $3, $4, $5)",
+        plan_rows,
+    )
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO admission_stats "
+        "(campaign_id, specialization_id, applications, enrolled, passing_score, avg_score) "
+        "VALUES ($1, $2, $3, $4, $5, $6)",
+        stat_rows,
+    )
 
 
 async def seed_users(ctx: SeedContext) -> None:
@@ -631,43 +702,47 @@ async def seed_users(ctx: SeedContext) -> None:
         entries.append(("demo_admin", None, ctx.admin_ids[0]))
     entries.append(("demo_user", None, None))
 
-    for external_id, student_id, staff_id in entries:
-        await ctx.conn.execute(
-            "INSERT INTO users (student_id, staff_id, email, password_hash, is_active) "
-            "VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (email) DO NOTHING",
-            student_id,
-            staff_id,
-            f"{external_id}@example.com",
-            demo_hash,
-        )
+    await _exec_many(
+        ctx.conn,
+        "INSERT INTO users (student_id, staff_id, email, password_hash, is_active) "
+        "VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (email) DO NOTHING",
+        [
+            (student_id, staff_id, f"{external_id}@example.com", demo_hash)
+            for external_id, student_id, staff_id in entries
+        ],
+    )
 
 
 async def main() -> None:
     conn = await asyncpg.connect(settings.database_url_owner)
     try:
-        # Идемпотентность: очищаем всё
-        await conn.execute(
-            "TRUNCATE admission_stats, admission_plans, admission_committee_members, "
-            "admission_committees, admission_campaigns, marks, lesson_group, lessons, "
-            "terms, subjects, staff, positions, students, student_statuses, groups, "
-            "specializations, departments, faculties, buildings, classrooms, users, "
-            "query_log RESTART IDENTITY CASCADE"
-        )
-        ctx = SeedContext(conn)
-        ctx.faker.seed_instance(42)
+        # Вся вставка — в одной транзакции (идемпотентность + атомарность), а
+        # строки вставляются пачками (см. _insert_rows/_exec_many): так сид
+        # быстр и на удалённой БД с большим сетевым round-trip'ом.
+        async with conn.transaction():
+            # Идемпотентность: очищаем всё
+            await conn.execute(
+                "TRUNCATE admission_stats, admission_plans, admission_committee_members, "
+                "admission_committees, admission_campaigns, marks, lesson_group, lessons, "
+                "terms, subjects, staff, positions, students, student_statuses, groups, "
+                "specializations, departments, faculties, buildings, classrooms, users, "
+                "query_log RESTART IDENTITY CASCADE"
+            )
+            ctx = SeedContext(conn)
+            ctx.faker.seed_instance(42)
 
-        await seed_terms(ctx)
-        await seed_positions_statuses(ctx)
-        await seed_faculties_departments(ctx)
-        await seed_specializations_groups(ctx)
-        await seed_staff(ctx)
-        await seed_subjects(ctx)
-        await seed_rooms(ctx)
-        await seed_students(ctx)
-        await seed_lessons(ctx)
-        await seed_marks(ctx)
-        await seed_admission(ctx)
-        await seed_users(ctx)
+            await seed_terms(ctx)
+            await seed_positions_statuses(ctx)
+            await seed_faculties_departments(ctx)
+            await seed_specializations_groups(ctx)
+            await seed_staff(ctx)
+            await seed_subjects(ctx)
+            await seed_rooms(ctx)
+            await seed_students(ctx)
+            await seed_lessons(ctx)
+            await seed_marks(ctx)
+            await seed_admission(ctx)
+            await seed_users(ctx)
 
         print(f"faculties: {len(ctx.faculty_ids)}")
         print(f"departments: {len(ctx.dept_ids)}")
