@@ -10,12 +10,12 @@
 Пользователь (HTTP)
    │  POST /ask  { question }
    ▼
-packages/app  (FastAPI, конвейер text-to-SQL)
-   │  1. аутентификация (JWT: вход по логину/паролю; sub = users.id)
-   │  2. генерация SQL через LLM (OpenAI-совместимый API, конфигурируемый)
-   │  3. маскированное описание схемы под пользователя (get_schema)
-   │  4. вызов шлюза (передаётся users.id)
-   │  5. пересказ результата по-русски вторым LLM-вызовом
+packages/app  (FastAPI, тул-агент)
+   │  1. аутентификация (JWT: вход по логину/паролю; sub = users.id; гость — без токена)
+   │  2. маскированная схема под пользователя (get_schema) → в системный промпт
+   │  3. цикл агента: LLM решает, когда вызвать тул execute_query (≤ agent_max_steps)
+   │     - execute_query → валидация+RLS+аудит в шлюзе; ошибка → LLM исправляет SQL
+   │  4. ответ — NDJSON-поток: status / query / token / done / error
    ▼
 packages/db  (ЕДИНСТВЕННЫЙ шлюз к БД)
    │  - резолюция identity: users.id → {student_id, staff_id} (+ роль из staff.position)
@@ -99,8 +99,8 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
   `users.id`). Роль в токен **не кладётся**: она резолвится на каждый запрос.
 - `GET /api/v1/auth/users/me` — текущая учётка (`Me`) с производной ролью
   (для бейджа в интерфейсе).
-- `POST /api/v1/ask` — конвейер text-to-SQL; **гость разрешён** (без токена →
-  `user_id=None`).
+- `POST /api/v1/ask` — тул-агент; ответ — **NDJSON-поток**; **гость разрешён**
+  (без токена → `user_id=None`).
 
 Учётные записи и их связки `student_id`/`staff_id` заводятся **вне приложения**
 (сид / руками в БД): у app нет ни управления учётками, ни write-доступа к
@@ -110,7 +110,7 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
 Структура (`packages/app/src/app/`):
 
 - `main.py` — `create_app()`: один `Gateway`, контейнер `AppContext(gateway,
-  auth, pipeline)`, lifespan закрывает `Gateway`. Инъекция — через override
+  auth, agent)`, lifespan закрывает `Gateway`. Инъекция — через override
   `get_context` (единственный шов DI, используется и тестами).
 - `context.py` — `AppContext` (dataclass) и DI-хук `get_context`.
 - `auth/schemas.py` — `LoginRequest`, `TokenResponse`, `Me`.
@@ -121,15 +121,21 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
 - `auth/router.py` — `/login`, `/users/me`.
 - `services/auth.py` — `AuthService(gateway)`: `authenticate` (bcrypt с
   dummy-hash против timing-оракла, email нормализуется), `get_me`.
-- `services/pipeline.py` — `Pipeline(gateway, llm)`: `ask(question, user_id,
-  role)` → `get_schema(user_id)` → LLM-генерация SQL → `execute_query(sql,
-  user_id)` → пересказ → `Answer`/`QueryMeta`. Ошибки шлюза/LLM — наверх без
-  ретрая (ADR 24).
-- `llm/` — `llm.py` (клиент), `prompts.py` (промпты), `render.py`
-  (`schema_to_text`: читаемое описание схемы для LLM + блок identity).
-- `api/ask.py` — `POST /ask` через `get_optional_context`; `GatewayError`/
-  `LLMError` → 502.
-- `core/` — `config.py` (JWT + LLM настройки), `security.py` (bcrypt + JWT RS256).
+- `agent/` — тул-агент (см. ADR 36):
+  - `prompts.py` — системный промпт (read-only SELECT, LIMIT, PII, самокоррекция)
+    + `build_system_prompt(schema_text, role)`;
+  - `tools.py` — `EXECUTE_QUERY_SCHEMA` и `ToolExecutor(gateway, user_id)`
+    (`ToolResult(content, meta)`; `GatewayError` → текст ошибки);
+  - `agent.py` — `Agent.stream(question, user_id, role)` — цикл LLM-вызовов
+    (≤ `agent_max_steps`) со стримингом: токены финального текста идут сразу,
+    `tool_call_chunks` собираются и исполняются после шага; события
+    `status/query/token/done/error`; `AgentError`.
+- `llm/` — `llm.py` (`ChatLLM.stream(messages, tools)` через `astream` +
+  `bind_tools`, `LLMError`), `render.py` (`schema_to_text`).
+- `api/ask.py` — `POST /ask` через `get_optional_context`; отдаёт
+  `StreamingResponse` (NDJSON), формат событий — см. ADR 36.
+- `core/` — `config.py` (JWT + LLM + `agent_max_steps`), `security.py`
+  (bcrypt + JWT RS256).
 
 App использует из `db` только: `get_user_by_login`, `get_user`,
 `resolve_identity`, `resolve_role`, `get_schema`, `execute_query`.
