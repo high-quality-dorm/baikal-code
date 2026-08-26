@@ -176,13 +176,21 @@ export default function Chat() {
             )
           );
         },
-        onQuery: (meta) => {
+        onQuery: (query) => {
           streamed = true;
-          answerMeta = meta;
+          answerMeta = {
+            sql: query.sql,
+            row_count: query.row_count,
+            truncated: query.truncated,
+            duration_ms: query.duration_ms,
+          };
         },
         onDone: (meta) => finish(answerText, meta, null),
         onError: (message) => finish("", null, message),
       });
+      // Стрим закрылся без done/error (обрыв соединения) — финализируем тем,
+      // что успели получить: текст + последний выполненный SQL.
+      finish(answerText, answerMeta, null);
     } catch (err) {
       if (err?.name === "AbortError") {
         // Пользователь нажал «Остановить» — оставляем накопленный текст.
