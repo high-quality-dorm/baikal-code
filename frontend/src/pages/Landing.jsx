@@ -206,7 +206,7 @@ export default function Landing() {
             {FEATURES.map((feature, i) => (
               <Reveal
                 key={feature.title}
-                className={`feature${feature.featured ? " feature--wide" : ""}`}
+                className={`feature${feature.featured ? " feature--accent" : ""}`}
                 delay={(i % 2) * 90}
               >
                 <div className="feature__icon">

@@ -187,26 +187,16 @@
 
 .features {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
-.feature--wide {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 24px;
-  align-items: center;
+.feature--accent {
   background: linear-gradient(
     135deg,
     var(--color-primary-soft),
     var(--color-card) 70%
   );
-}
-
-.feature--wide .feature__icon {
-  width: 56px;
-  height: 56px;
 }
 
 .feature {
@@ -562,9 +552,6 @@
     grid-template-columns: 1fr;
   }
   .features {
-    grid-template-columns: 1fr;
-  }
-  .feature--wide {
     grid-template-columns: 1fr;
   }
   .step {
