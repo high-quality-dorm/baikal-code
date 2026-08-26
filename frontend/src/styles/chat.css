@@ -194,7 +194,7 @@
 }
 
 .msg__bubble {
-  max-width: 78%;
+  max-width: 100%;
   padding: 14px 18px;
   border-radius: var(--radius-md);
   font-size: 15.5px;
@@ -236,6 +236,8 @@
 .msg__body {
   display: grid;
   gap: 8px;
+  width: fit-content;
+  max-width: 78%;
 }
 
 .msg__status {
@@ -369,7 +371,8 @@
 /* Индикатор печати ассистента */
 
 .typing {
-  display: inline-flex;
+  display: flex;
+  justify-content: center;
   align-items: center;
   gap: 5px;
   padding: 6px 2px;
@@ -378,6 +381,7 @@
 .typing span {
   width: 7px;
   height: 7px;
+  flex: 0 0 auto;
   border-radius: 50%;
   background: var(--color-primary);
   animation: typing-bounce 1.2s ease-in-out infinite;
@@ -736,7 +740,7 @@ body.chat-page::-webkit-scrollbar-thumb:hover {
 }
 
 @media (max-width: 640px) {
-  .msg__bubble {
+  .msg__body {
     max-width: 88%;
   }
   .chat__header-user {
