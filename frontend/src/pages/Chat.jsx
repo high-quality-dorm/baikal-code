@@ -8,6 +8,7 @@ import Markdown from "../components/Markdown.jsx";
 import { useAuth } from "../lib/auth.jsx";
 import { askStream, ApiError, EndpointMissingError } from "../lib/api.js";
 import { mockAnswer, SUGGESTED_QUESTIONS } from "../lib/mock.js";
+import { buildContext } from "../lib/chatUtils.js";
 import {
   IconSend,
   IconStop,
@@ -18,18 +19,6 @@ import {
 } from "../components/icons.jsx";
 
 const MAX_LEN = 2000;
-
-/** Собирает текст запроса: предыдущие реплики беседы + новый вопрос. */
-function buildContext(messages, question) {
-  const lines = [];
-  for (const msg of messages) {
-    if (!msg.text) continue;
-    const label = msg.role === "user" ? "Пользователь" : "Ассистент";
-    lines.push(`${label}: ${msg.text}`);
-  }
-  if (lines.length === 0) return question;
-  return `Ранее в беседе:\n${lines.join("\n")}\nНовый вопрос: ${question}`;
-}
 
 function TypingDots() {
   return (
