@@ -311,6 +311,10 @@
   overflow: hidden;
 }
 
+.sql-block + .sql-block {
+  margin-top: 8px;
+}
+
 .sql-block__head {
   display: flex;
   align-items: center;
@@ -343,6 +347,8 @@
   font-size: 13px;
   line-height: 1.6;
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
   color: var(--color-foreground);
 }
 

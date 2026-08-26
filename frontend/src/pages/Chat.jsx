@@ -69,7 +69,7 @@ function Message({ message, meta, isLast, status = null, streaming = false }) {
           {meta?.error && <div style={{ marginTop: 6 }}>{meta.error}</div>}
         </div>
         {!isUser && meta?.sql && isLast && (
-          <SqlDisclosure sql={meta.sql} meta={meta} />
+          <SqlDisclosure sql={meta.sql} meta={meta} queries={meta.queries} />
         )}
         {!isUser && meta?.row_count !== undefined && !meta?.error && (
           <div className="msg__meta">
@@ -135,6 +135,7 @@ export default function Chat() {
     abortRef.current = controller;
     let answerText = "";
     let answerMeta = null;
+    let answerQueries = [];
     let streamed = false;
     let finished = false;
 
@@ -144,13 +145,19 @@ export default function Chat() {
       setPending(false);
       setStatus(null);
       abortRef.current = null;
+      const finalMeta = error
+        ? { error }
+        : {
+            ...(meta ?? {}),
+            ...(answerQueries.length > 0 ? { queries: answerQueries } : {}),
+          };
       setMessages((m) =>
         m.map((msg) =>
           msg.id === assistantId
             ? {
                 ...msg,
                 text: error ? "" : textValue,
-                meta: error ? { error } : meta ?? {},
+                meta: finalMeta,
                 streamed,
               }
             : msg
@@ -188,6 +195,7 @@ export default function Chat() {
             truncated: query.truncated,
             duration_ms: query.duration_ms,
           };
+          answerQueries.push(answerMeta);
           // Инструмент execute_query сработал — показываем, что идёт сбор данных.
           setStatus("Собираю данные…");
         },
