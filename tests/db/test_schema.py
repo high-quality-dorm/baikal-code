@@ -68,6 +68,21 @@ _FULL_CATALOG: list[dict[str, object]] = [
     _column("positions", "title"),
     _column("users", "id"),
     _column("query_log", "id"),
+    _column("v_students_total", "students"),
+    _column("v_students_by_faculty", "faculty_id"),
+    _column("v_students_by_faculty", "faculty_title"),
+    _column("v_students_by_faculty", "students"),
+    _column("v_students_by_specialization", "specialization_id"),
+    _column("v_students_by_specialization", "students"),
+    _column("v_students_by_group", "group_id"),
+    _column("v_students_by_group", "students"),
+    _column("v_students_by_status", "status_id"),
+    _column("v_students_by_status", "students"),
+    _column("v_students_by_admission_year", "admission_year"),
+    _column("v_students_by_admission_year", "students"),
+    _column("v_students_expelled", "admission_year"),
+    _column("v_students_expelled", "faculty_id"),
+    _column("v_students_expelled", "students"),
 ]
 
 
@@ -131,12 +146,28 @@ def test_describe_guest_excludes_students_and_marks() -> None:
     assert "query_log" not in names
 
 
+def test_describe_guest_sees_public_aggregate_views() -> None:
+    """Публичные агрегатные вью (численность, без PII) видны гостю."""
+    tables = _describe(_FULL_CATALOG, None)
+    names = {t.name for t in tables}
+    assert {
+        "v_students_total",
+        "v_students_by_faculty",
+        "v_students_by_specialization",
+        "v_students_by_group",
+        "v_students_by_status",
+        "v_students_by_admission_year",
+        "v_students_expelled",
+    } <= names
+
+
 def test_describe_authenticated_includes_all_domain_tables() -> None:
     tables = _describe(_FULL_CATALOG, _STUDENT_IDENTITY)
     names = {t.name for t in tables}
     assert {"faculties", "students", "positions", "lesson_group"} <= names
     assert "users" not in names
     assert "query_log" not in names
+    assert "v_students_total" in names
 
 
 def test_describe_marks_sensitive_columns() -> None:
@@ -181,9 +212,12 @@ def test_describe_columns_shape() -> None:
     )
 
 
-@pytest.mark.parametrize("meta", TABLE_META.values())
-def test_table_meta_covers_v2_schema(meta: dict[str, object]) -> None:
-    """Статическое описание таблиц v2: есть PK и поля описания."""
-    assert meta["primary_key"]
+@pytest.mark.parametrize("name,meta", TABLE_META.items())
+def test_table_meta_covers_v2_schema(name: str, meta: dict[str, object]) -> None:
+    """Статическое описание: есть поля описания; PK пуст только у вью `v_*`."""
     assert "columns" in meta
     assert "description" in meta
+    if name.startswith("v_"):
+        assert isinstance(meta["primary_key"], list)
+    else:
+        assert meta["primary_key"]
