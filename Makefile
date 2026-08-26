@@ -26,18 +26,18 @@ seed:
 	uv run python scripts/seed.py
 
 format:
-	uv run ruff check --select I --fix packages/
-	uv run ruff check --fix packages/
-	uv run ruff format packages/
+	uv run ruff check --select I --fix packages/db/
+	uv run ruff check --fix packages/db/
+	uv run ruff format packages/db/
 
 check:
-	uv run ty check packages/
-	uv run ruff check packages/
-	uv run ruff format --check packages/
+	uv run ty check packages/db/
+	uv run ruff check packages/db/
+	uv run ruff format --check packages/db/
 	uv run python scripts/check_docs.py
 
 docs-check:
 	uv run python scripts/check_docs.py
 
 test:
-	uv run pytest tests/
+	uv run pytest tests/db/

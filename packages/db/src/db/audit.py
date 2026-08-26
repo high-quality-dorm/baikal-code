@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from db_mcp.access import Pools
+from db.access import Pools
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,8 @@ class Auditor:
     async def record(
         self,
         *,
-        role: str,
-        user_id: str,
+        role: str | None,
+        user_id: str | None,
         sql_query: str,
         status: str,
         row_count: int | None = None,

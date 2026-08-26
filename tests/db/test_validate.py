@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from db_mcp.validate import MAX_ROWS, ValidationError, validate
+from db.validate import MAX_ROWS, ValidationError, validate
 
 
 @pytest.mark.parametrize(
@@ -12,14 +12,14 @@ from db_mcp.validate import MAX_ROWS, ValidationError, validate
     [
         "SELECT * FROM students",
         "select faculty_id, title from faculties",
-        "SELECT count(*) FROM academic_records",
+        "SELECT count(*) FROM marks",
         "WITH x AS (SELECT 1) SELECT * FROM x",
         "SELECT * FROM groups WHERE admission_year = 2025",
-        'SELECT title FROM courses WHERE title LIKE \'%ы%\';',  # trailing semicolon
+        'SELECT title FROM subjects WHERE title LIKE \'%ы%\';',  # trailing semicolon
         "SELECT 1",  # -- комментарий в конце
         # set-операции
         "SELECT 1 UNION SELECT 2",
-        "SELECT title FROM courses UNION SELECT title FROM groups",
+        "SELECT title FROM subjects UNION SELECT title FROM groups",
         "SELECT 1 UNION ALL SELECT 2",
         "SELECT 1 INTERSECT SELECT 1",
         "SELECT 1 INTERSECT ALL SELECT 1",

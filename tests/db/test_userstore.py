@@ -1,23 +1,16 @@
-"""Тесты хранилища учёток db_mcp (UserStore) — без реальной БД.
+"""Тесты хранилища учёток db (UserStore) — без реальной БД.
 
 Проверяется контракт SQL (фиксированные параметризованные запросы),
-валидация роли/internal_id и обработка ошибок (дубликат логина, not-found).
+обработка ошибок (дубликат логина, not-found) и `has_admin`.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from db_mcp.access import Pools
-from db_mcp.settings import Settings
-from db_mcp.userstore import (
-    DuplicateLoginError,
-    InvalidRoleError,
-    UserStore,
-    UserStoreError,
-    _validate_internal_id,
-    _validate_role,
-)
+from db.access import Pools
+from db.settings import Settings
+from db.userstore import DuplicateLoginError, UserStore
 
 
 class _FakeConn:
@@ -78,51 +71,34 @@ def _make_store(monkeypatch: pytest.MonkeyPatch, conn: _FakeConn) -> UserStore:
     return UserStore(pools)
 
 
-_ROW = (7, "ext-7", "a@b.c", "hash", "student", 100, "Студент", True)
-
-
-def test_validate_role_accepts_business_roles() -> None:
-    assert _validate_role("student") == "student"
-    assert _validate_role("admin") == "admin"
-
-
-def test_validate_role_rejects_unknown() -> None:
-    with pytest.raises(InvalidRoleError):
-        _validate_role("hacker")
-
-
-def test_validate_internal_id() -> None:
-    assert _validate_internal_id(None) is None
-    assert _validate_internal_id(5) == 5
-    with pytest.raises(UserStoreError):
-        _validate_internal_id(0)
+_ROW = (7, 1, None, "a@b.c", "hash", True)
 
 
 @pytest.mark.anyio
-async def test_get_credentials_found(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_by_email_found(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _FakeConn()
     conn.fetchrow_result = _ROW
     store = _make_store(monkeypatch, conn)
 
-    user = await store.get_credentials("a@b.c")
+    user = await store.get_by_email("a@b.c")
 
     assert user is not None
     assert user.id == 7
+    assert user.student_id == 1
+    assert user.staff_id is None
     assert user.email == "a@b.c"
-    assert user.role == "student"
-    assert user.internal_id == 100
     assert user.is_active is True
     sql = conn.executed[0][0]
-    assert "FROM users" in sql and "email = $1 OR external_id = $1" in sql
+    assert "FROM users" in sql and "email = $1" in sql
 
 
 @pytest.mark.anyio
-async def test_get_credentials_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_by_email_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _FakeConn()
     conn.fetchrow_result = None
     store = _make_store(monkeypatch, conn)
 
-    assert await store.get_credentials("nobody") is None
+    assert await store.get_by_email("nobody") is None
 
 
 @pytest.mark.anyio
@@ -140,53 +116,56 @@ async def test_find(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.anyio
 async def test_all(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _FakeConn()
-    conn.fetch_result = [_ROW, (8, "ext-8", None, "h", "teacher", None, None, True)]
+    conn.fetch_result = [_ROW, (8, None, 4, "b@c.d", "h", True)]
     store = _make_store(monkeypatch, conn)
 
     users = await store.all()
 
     assert len(users) == 2
     assert users[0].id == 7
-    assert users[1].role == "teacher"
-    assert users[1].email is None
+    assert users[1].staff_id == 4
+    assert users[1].student_id is None
 
 
 @pytest.mark.anyio
-async def test_create_assigns_id_and_uses_fixed_sql(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_create_assigns_id_and_uses_fixed_sql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     conn = _FakeConn()
     conn.fetchval_result = 10
     store = _make_store(monkeypatch, conn)
 
     user = await store.create(
-        external_id="ext-10",
         email="x@y.z",
         password_hash="hash",
-        role="student",
-        internal_id=42,
-        display_name="Иван",
+        student_id=42,
+        staff_id=None,
     )
 
     assert user.id == 10
+    assert user.student_id == 42
     sql, args = conn.executed[0]
     assert sql.strip().startswith("INSERT INTO users")
-    assert args == ("ext-10", "x@y.z", "hash", "student", 42, "Иван", True)
+    assert args == (42, None, "x@y.z", "hash", True)
 
 
 @pytest.mark.anyio
-async def test_create_rejects_bad_role(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_create_allows_no_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    """student_id/staff_id необязательны — учётка-«гость» без обоих."""
     conn = _FakeConn()
+    conn.fetchval_result = 11
     store = _make_store(monkeypatch, conn)
 
-    with pytest.raises(InvalidRoleError):
-        await store.create(
-            external_id="x",
-            email="a@b.c",
-            password_hash="h",
-            role="hacker",
-            internal_id=None,
-            display_name=None,
-        )
-    assert conn.executed == []
+    user = await store.create(
+        email="guest@x.yz",
+        password_hash="hash",
+        student_id=None,
+        staff_id=None,
+    )
+
+    assert user.id == 11
+    assert user.student_id is None
+    assert user.staff_id is None
 
 
 def _unique_violation() -> Exception:
@@ -204,17 +183,17 @@ async def test_create_duplicate_login_raises(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(DuplicateLoginError):
         await store.create(
-            external_id="ext-10",
             email="x@y.z",
             password_hash="hash",
-            role="student",
-            internal_id=None,
-            display_name=None,
+            student_id=None,
+            staff_id=None,
         )
 
 
 @pytest.mark.anyio
-async def test_update_preserves_existing_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_update_preserves_existing_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     conn = _FakeConn()
     conn.fetchrow_result = _ROW
     store = _make_store(monkeypatch, conn)
@@ -223,9 +202,8 @@ async def test_update_preserves_existing_fields(monkeypatch: pytest.MonkeyPatch)
         7,
         email=None,
         password_hash="newhash",
-        role=None,
-        internal_id=None,
-        display_name=None,
+        student_id=None,
+        staff_id=None,
         is_active=True,
     )
 
@@ -233,12 +211,12 @@ async def test_update_preserves_existing_fields(monkeypatch: pytest.MonkeyPatch)
     assert updated.id == 7
     assert updated.password_hash == "newhash"
     assert updated.email == "a@b.c"  # непустые поля сохраняются
-    assert updated.role == "student"
+    assert updated.student_id == 1
     sql, args = conn.executed[-1]
     assert sql.strip().startswith("UPDATE users")
-    assert args[0] == "a@b.c"  # email из текущей учётки
-    assert args[1] == "newhash"
-    assert args[6] == 7
+    assert args[0] == 1  # student_id из текущей учётки
+    assert args[2] == "a@b.c"  # email из текущей учётки
+    assert args[5] == 7
 
 
 @pytest.mark.anyio
@@ -251,9 +229,8 @@ async def test_update_missing_returns_none(monkeypatch: pytest.MonkeyPatch) -> N
         999,
         email=None,
         password_hash=None,
-        role=None,
-        internal_id=None,
-        display_name=None,
+        student_id=None,
+        staff_id=None,
         is_active=None,
     )
 
@@ -275,10 +252,32 @@ async def test_deactivate(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_deactivate_missing_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_deactivate_missing_returns_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     conn = _FakeConn()
     conn.fetchrow_result = None
     store = _make_store(monkeypatch, conn)
 
     assert await store.deactivate(999) is False
     assert not any("is_active = FALSE" in sql for sql, _ in conn.executed)
+
+
+@pytest.mark.anyio
+async def test_has_admin(monkeypatch: pytest.MonkeyPatch) -> None:
+    conn = _FakeConn()
+    conn.fetchval_result = True
+    store = _make_store(monkeypatch, conn)
+
+    assert await store.has_admin() is True
+    sql = conn.executed[0][0]
+    assert "positions" in sql and "title = 'admin'" in sql
+
+
+@pytest.mark.anyio
+async def test_has_admin_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    conn = _FakeConn()
+    conn.fetchval_result = False
+    store = _make_store(monkeypatch, conn)
+
+    assert await store.has_admin() is False

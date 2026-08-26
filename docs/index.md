@@ -22,7 +22,7 @@
 | `README.md`        | Обзор проекта, монорепо-структура, быстрый старт, команды make             | Первое знакомство, онбординг                   |
 | `index.md`         | Навигация по документации: что в каком файле лежит, где код               | Быстро найти нужный документ / читать точечно  |
 | `roles.md`          | Роли пользователей, что выводимо и что запрещено, PII-политика; роль выводится из `student_id`/`staff_id`, служебные роли БД | Уточнить бизнес-требования по доступу, понять identity |
-| `architecture.md`    | Схема пакетов (`db_mcp` + `app`), поток запроса (включая резолюцию identity), 3 уровня безопасности, модель доступа | Понять, как система устроена в целом          |
+| `architecture.md`    | Схема пакетов (`db` + `app`), поток запроса (включая резолюцию identity), 3 уровня безопасности, модель доступа | Понять, как система устроена в целом          |
 | `design.md`         | Дизайн-система (токены, цвета, типографика), описание страниц (лендинг/чат/вход), правила гостевого доступа | Понять визуальный язык продукта и состав экранов |
 | `decisions.md`       | Зафиксированные архитектурные решения и их обоснование (ADR)               | Почему выбран тот или иной подход, что решили  |
 | `roadmap.md`         | Этапы разработки, что завершено (с коммитами), что впереди, правила работы | Понять текущее состояние и следующий шаг      |
@@ -32,12 +32,11 @@
 
 | Что                                                   | Расположение                                 |
 | ----------------------------------------------------- | -------------------------------------------- |
-| Доменные сущности БД (с PII-метками)                  | `packages/db_mcp/src/db_mcp/models.py`       |
-| Модули шлюза db_mcp (roles/access/validate/schema/audit/userstore)    | `packages/db_mcp/src/db_mcp/`                 |
-| MCP-сервер шлюза (get_schema, execute_query)          | `packages/db_mcp/src/db_mcp/server.py`        |
+| Модели контракта db (Identity, QueryResult, SchemaDescription, UserRecord) | `packages/db/src/db/models.py`            |
+| Модули пакета db (access/identity/validate/schema/audit/userstore)  | `packages/db/src/db/`                       |
+| Фасад db (get_schema, execute_query, CRUD учёток)                | `packages/db/src/db/gateway.py`             |
 | API-схемы (Question, Answer, QueryMeta)                | `packages/app/src/app/api/schemas.py`        |
 | Конвейер text-to-SQL (`Pipeline`, `POST /api/v1/ask`)  | `packages/app/src/app/services/pipeline.py`, `api/ask.py` |
-| MCP-клиент к шлюзу (stdio)                             | `packages/app/src/app/gateway/client.py`      |
 | LLM-клиент (ChatOpenAI) и промпты                      | `packages/app/src/app/llm/`                   |
 | Схема БД (22 таблицы)                                  | `db/01_schema.sql`                           |
 | Роли и права (app_ro/app_service), set-based RLS       | `db/02_roles.sql`, `db/03_rls.sql`          |

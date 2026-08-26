@@ -11,8 +11,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from app.core.config import Settings
-
 
 def gen_keypair(tmp_path: Path) -> tuple[Path, Path]:
     """Генерирует самоподписанный RSA-сертификат и закрытый ключ (для RS256)."""
@@ -44,10 +42,15 @@ def gen_keypair(tmp_path: Path) -> tuple[Path, Path]:
 
 @pytest.fixture
 def rsa_keys(tmp_path, monkeypatch):
-    """Подменяет settings на свежий RSA-ключ для подписи/проверки JWT."""
-    cert_path, key_path = gen_keypair(tmp_path)
+    """Подменяет settings на свежий RSA-ключ для подписи/проверки JWT.
+
+    Импорт app ленивый: фикстура нужна только app-тестам, которые временно
+    исключены из проверок до ребилда (см. roadmap).
+    """
+    from app.core.config import Settings
     from app.core import security as security_mod
 
+    cert_path, key_path = gen_keypair(tmp_path)
     monkeypatch.setattr(
         security_mod,
         "settings",

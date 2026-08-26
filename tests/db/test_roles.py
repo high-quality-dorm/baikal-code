@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Должности персонала, из которых выводятся роли (seed + политики RLS)
 KNOWN_POSITIONS = frozenset({"teacher", "head", "dean", "admin"})
