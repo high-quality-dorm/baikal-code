@@ -6,10 +6,11 @@ import RoleBadge from "../components/RoleBadge.jsx";
 import SqlDisclosure from "../components/SqlDisclosure.jsx";
 import { useAuth } from "../lib/auth.jsx";
 import { useTypewriter } from "../lib/typewriter.js";
-import { ask, ApiError, EndpointMissingError } from "../lib/api.js";
+import { askStream, ApiError, EndpointMissingError } from "../lib/api.js";
 import { mockAnswer, SUGGESTED_QUESTIONS } from "../lib/mock.js";
 import {
   IconSend,
+  IconStop,
   IconX,
   IconAlert,
   IconUser,
@@ -39,8 +40,10 @@ function AssistantText({ text }) {
   );
 }
 
-function Message({ message, meta, isLast }) {
+function Message({ message, meta, isLast, status = null, streaming = false }) {
   const isUser = message.role === "user";
+  const showStatus = !isUser && streaming && !!status && isLast;
+  const showDots = streaming && !message.text && !showStatus;
   return (
     <article className={`msg msg--${message.role}${meta?.error ? " msg--error" : ""}`}>
       <div className="msg__avatar" aria-hidden="true">
@@ -52,9 +55,14 @@ function Message({ message, meta, isLast }) {
       </div>
       <div className="msg__body">
         <div className="msg__bubble">
+          {showStatus && <div className="msg__status">{status}</div>}
           {meta?.error ? (
             <strong>Не удалось выполнить запрос.</strong>
           ) : isUser ? (
+            message.text
+          ) : showDots ? (
+            <TypingDots />
+          ) : streaming || message.streamed ? (
             message.text
           ) : (
             <AssistantText text={message.text} />
@@ -81,10 +89,12 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [status, setStatus] = useState(null);
   const [bannerVisible, setBannerVisible] = useState(true);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const pendingRef = useRef(false);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     pendingRef.current = pending;
@@ -101,69 +111,92 @@ export default function Chat() {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages, pending]);
+  }, [messages, pending, status]);
+
+  function stop() {
+    abortRef.current?.abort();
+  }
 
   async function send(text) {
     const question = text.trim();
     if (!question || pendingRef.current) return;
     setInput("");
-    setPending(true);
+    const assistantId = crypto.randomUUID();
     setMessages((m) => [
       ...m,
       { id: crypto.randomUUID(), role: "user", text: question },
+      { id: assistantId, role: "assistant", text: "", meta: {}, streamed: false },
     ]);
+    setPending(true);
+    setStatus(null);
 
-    let answer;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let answerText = "";
+    let answerMeta = null;
+    let streamed = false;
+    let finished = false;
+
+    const finish = (textValue, meta, error) => {
+      if (finished) return;
+      finished = true;
+      setPending(false);
+      setStatus(null);
+      abortRef.current = null;
+      setMessages((m) =>
+        m.map((msg) =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                text: error ? "" : textValue,
+                meta: error ? { error } : meta ?? {},
+                streamed,
+              }
+            : msg
+        )
+      );
+    };
+
     try {
-      if (!isAuthed) {
-        // Гость: /ask требует авторизацию — отвечаем локальным mock.
-        answer = mockAnswer(question);
-      } else {
-        answer = await ask(question, { token: session?.accessToken });
-      }
+      await askStream(question, {
+        token: session?.accessToken,
+        signal: controller.signal,
+        onStatus: (message) => {
+          streamed = true;
+          setStatus(message);
+        },
+        onToken: (delta) => {
+          streamed = true;
+          answerText += delta;
+          // Начался текст ответа — статусная строка этапа больше не нужна.
+          setStatus(null);
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === assistantId ? { ...msg, text: answerText } : msg
+            )
+          );
+        },
+        onQuery: (meta) => {
+          streamed = true;
+          answerMeta = meta;
+        },
+        onDone: (meta) => finish(answerText, meta, null),
+        onError: (message) => finish("", null, message),
+      });
     } catch (err) {
-      if (err instanceof EndpointMissingError) {
+      if (err?.name === "AbortError") {
+        // Пользователь нажал «Остановить» — оставляем накопленный текст.
+        finish(answerText, answerMeta, null);
+      } else if (err instanceof EndpointMissingError) {
         // /ask недоступен (бэкенд не запущен) — отвечаем локальным mock.
-        answer = mockAnswer(question);
+        const answer = mockAnswer(question);
+        finish(answer.text, answer.meta, null);
       } else if (err instanceof ApiError) {
-        setMessages((m) => [
-          ...m,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: "",
-            meta: { error: err.message },
-          },
-        ]);
-        setPending(false);
-        return;
+        finish("", null, err.message);
       } else {
-        setMessages((m) => [
-          ...m,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: "",
-            meta: {
-              error: "Не удалось связаться с сервером. Попробуйте ещё раз.",
-            },
-          },
-        ]);
-        setPending(false);
-        return;
+        finish("", null, "Не удалось связаться с сервером. Попробуйте ещё раз.");
       }
     }
-
-    setMessages((m) => [
-      ...m,
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: answer.text,
-        meta: answer.meta,
-      },
-    ]);
-    setPending(false);
   }
 
   function handleKeyDown(e) {
@@ -201,12 +234,12 @@ export default function Chat() {
               {isAuthed ? (
                 <>
                   <RoleBadge role={user.role} />
-                  {user.display_name && (
-                    <span className="chat__user-name">{user.display_name}</span>
+                  {user.email && (
+                    <span className="chat__user-name">{user.email}</span>
                   )}
                 </>
               ) : (
-                <RoleBadge role={null} />
+                <RoleBadge guest />
               )}
             </div>
           </div>
@@ -287,20 +320,10 @@ export default function Chat() {
                 message={message}
                 meta={message.meta}
                 isLast={i === messages.length - 1}
+                status={status}
+                streaming={pending && i === messages.length - 1}
               />
             ))}
-            {pending && (
-              <article className="msg msg--assistant">
-                <div className="msg__avatar" aria-hidden="true">
-                  <IconSparkles width={18} height={18} />
-                </div>
-                <div className="msg__body">
-                  <div className="msg__bubble">
-                    <TypingDots />
-                  </div>
-                </div>
-              </article>
-            )}
             <div ref={scrollRef} className="chat__scroll-anchor" />
           </>
         )}
@@ -326,12 +349,16 @@ export default function Chat() {
             />
             <button
               type="button"
-              className="composer__send"
-              onClick={() => send(input)}
-              disabled={!input.trim() || pending}
-              aria-label="Отправить вопрос"
+              className={`composer__send${pending ? " composer__send--stop" : ""}`}
+              onClick={pending ? stop : () => send(input)}
+              disabled={!pending && !input.trim()}
+              aria-label={pending ? "Остановить ответ" : "Отправить вопрос"}
             >
-              <IconSend width={20} height={20} />
+              {pending ? (
+                <IconStop width={20} height={20} />
+              ) : (
+                <IconSend width={20} height={20} />
+              )}
             </button>
           </div>
           <div className="composer__footer">

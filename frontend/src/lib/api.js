@@ -37,13 +37,17 @@ export function fetchUser(token) {
   return request("/auth/users/me", { token });
 }
 
-export async function ask(question, { token } = {}) {
+export async function askStream(
+  question,
+  { token, signal, onStatus, onToken, onQuery, onDone, onError } = {}
+) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE}/ask`, {
     method: "POST",
     headers,
     body: JSON.stringify({ text: question }),
+    signal,
   });
   if (res.status === 404) throw new EndpointMissingError();
   if (!res.ok) {
@@ -59,7 +63,50 @@ export async function ask(question, { token } = {}) {
     if (!detail) throw new EndpointMissingError();
     throw new ApiError(res.status, detail);
   }
-  return res.json();
+  if (!res.body) throw new EndpointMissingError();
+
+  // Ответ — NDJSON-поток от тул-агента (см. ADR 36): status/query/token/done/error.
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (!line) continue;
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        switch (event?.type) {
+          case "status":
+            onStatus?.(event.message);
+            break;
+          case "token":
+            onToken?.(event.text);
+            break;
+          case "query":
+            onQuery?.(event);
+            break;
+          case "done":
+            onDone?.(event.meta);
+            break;
+          case "error":
+            onError?.(event.message);
+            break;
+        }
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
 }
 
 /** /ask ещё не реализован на бэкенде — сигнал переключиться на mock. */

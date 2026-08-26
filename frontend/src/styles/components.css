@@ -104,6 +104,18 @@
   border-color: transparent;
 }
 
+.badge--head {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: transparent;
+}
+
+.badge--dean {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: transparent;
+}
+
 .badge--admin {
   background: var(--color-foreground);
   color: var(--color-background);
