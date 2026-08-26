@@ -191,5 +191,3 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 `student_statuses`, `groups`, `students`, `courses`, `course_instructors`,
 `academic_records`, `rooms`, `schedule_slots`, `admission_plans`, `admission_stats`,
 `users`, `query_log`. Полное определение — в `db/01_schema.sql`.
-
-Почему выбран PostgreSQL 16 и остальные решения — см. [decisions.md](decisions.md).
