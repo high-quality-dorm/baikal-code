@@ -18,7 +18,9 @@
 -- department_id/faculty_id, получил бы доступ к скоупам кафедры/факультета.
 --
 -- Гость (нет app.student_id и app.staff_id): students/marks не видны вовсе
--- (deny-by-default); общие таблицы открыты через app_ro без RLS.
+-- (deny-by-default); общие таблицы открыты через app_ro без RLS. Публичные
+-- агрегаты по студентам (численность, без PII) доступны всем через вью
+-- db/04_views.sql.
 --
 -- Важно: после SET LOCAL в завершившейся транзакции переменная на
 -- переиспользуемом соединении пула принимает значение '' (пустая строка), а не
@@ -26,8 +28,13 @@
 -- бы при следующем запросе на том же соединении (гость и т.п.).
 
 -- ===== students =====
+-- FORCE RLS на students сознательно снят (ENABLE остаётся, все политики ниже
+-- действуют): владелец таблиц (app_owner) должен обходить RLS, чтобы считать
+-- публичные агрегаты через вью db/04_views.sql. Для app_ro (не владельца) RLS
+-- применяется всегда — доступ по строкам для гостя/студента/персонала не меняется.
+-- В dev app_owner — суперпользователь (обходит RLS и так); снятие FORCE нужно
+-- для прода, где app_owner на внешней БД может быть обычным владельцем.
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
-ALTER TABLE students FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS students_deny ON students;
 CREATE POLICY students_deny ON students FOR SELECT
