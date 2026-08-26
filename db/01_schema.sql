@@ -1,157 +1,200 @@
--- Схема базы данных университета.
+-- Схема базы данных университета (Baikal v2).
 -- Исполняется от имени app_owner (POSTGRES_USER) при первом старте контейнера.
 
--- 1. Факультеты (dean_id добавлен через ALTER ниже, т.к. ссылается на staff)
+-- 1. Здания
+CREATE TABLE buildings (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(100) NOT NULL
+);
+
+-- 2. Факультеты (dean_id добавляется ALTER'ом ниже — ссылается на staff)
 CREATE TABLE faculties (
-    faculty_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL UNIQUE,
     dean_id INT
 );
 
--- 2. Кафедры (head_id добавлен через ALTER ниже)
+-- 3. Кафедры (head_id добавляется ALTER'ом ниже)
 CREATE TABLE departments (
-    department_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     title VARCHAR(150) NOT NULL,
-    faculty_id INT NOT NULL REFERENCES faculties(faculty_id),
+    faculty_id INT NOT NULL REFERENCES faculties(id),
     head_id INT
 );
 
--- 3. Роли сотрудников
-CREATE TABLE roles (
+-- 4. Направления подготовки
+CREATE TABLE specializations (
     id SERIAL PRIMARY KEY,
-    title VARCHAR(50) NOT NULL
-);
-
--- 4. Сотрудники / преподаватели
-CREATE TABLE staff (
-    staff_id SERIAL PRIMARY KEY,
-    full_name VARCHAR(150) NOT NULL,
-    role_id INT REFERENCES roles(id),
-    department_id INT REFERENCES departments(department_id)
-);
-
--- 5. Направления подготовки
-CREATE TABLE specialties (
-    specialty_id SERIAL PRIMARY KEY,
+    faculty_id INT NOT NULL REFERENCES faculties(id),
     code VARCHAR(20) NOT NULL UNIQUE,
-    title VARCHAR(150) NOT NULL,
-    faculty_id INT NOT NULL REFERENCES faculties(faculty_id),
-    total_semesters INT NOT NULL DEFAULT 8
+    title VARCHAR(150) NOT NULL
 );
 
--- 6. Справочник статусов студентов
-CREATE TABLE student_statuses (
-    status_id SERIAL PRIMARY KEY,
-    title VARCHAR(50) NOT NULL UNIQUE
-);
-
--- 7. Учебные группы
+-- 5. Учебные группы
 CREATE TABLE groups (
-    group_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    specialization_id INT NOT NULL REFERENCES specializations(id),
     title VARCHAR(50) NOT NULL,
-    specialty_id INT NOT NULL REFERENCES specialties(specialty_id),
-    admission_year INT NOT NULL
+    admission_year INT NOT NULL,
+    UNIQUE (specialization_id, admission_year, title)
 );
 
--- 8. Профиль студента (name/surname/patronymic/passport — персональные данные)
+-- 6. Статусы студентов (is_studying — «учится сейчас» да/нет)
+CREATE TABLE student_statuses (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(50) NOT NULL UNIQUE,
+    is_studying BOOLEAN NOT NULL
+);
+
+-- 7. Студенты (name/surname/patronymic — PII, доступ ограничен RLS)
 CREATE TABLE students (
-    student_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    group_id INT REFERENCES groups(id),
+    status_id INT REFERENCES student_statuses(id),
+    admission_year INT NOT NULL,
     name VARCHAR(30) NOT NULL,
     surname VARCHAR(30) NOT NULL,
-    patronymic VARCHAR(30),
-    passport VARCHAR(20) NOT NULL UNIQUE,
-    specialty_id INT NOT NULL REFERENCES specialties(specialty_id),
-    group_id INT REFERENCES groups(group_id),
-    admission_year INT NOT NULL,
-    status_id INT REFERENCES student_statuses(status_id)
+    patronymic VARCHAR(30)
 );
 
--- 9. Учебные дисциплины
-CREATE TABLE courses (
-    course_id SERIAL PRIMARY KEY,
+-- 8. Должности персонала (teacher | head | dean | admin)
+CREATE TABLE positions (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(20) NOT NULL UNIQUE
+);
+
+-- 9. Сотрудники и преподаватели (ФИО — публично, не PII)
+CREATE TABLE staff (
+    id SERIAL PRIMARY KEY,
+    faculty_id INT REFERENCES faculties(id),
+    department_id INT REFERENCES departments(id),
+    position_id INT NOT NULL REFERENCES positions(id),
+    name VARCHAR(30) NOT NULL,
+    surname VARCHAR(30) NOT NULL,
+    patronymic VARCHAR(30)
+);
+
+-- 10. Дисциплины (закреплены за кафедрой)
+CREATE TABLE subjects (
+    id SERIAL PRIMARY KEY,
     title VARCHAR(150) NOT NULL,
-    department_id INT REFERENCES departments(department_id),
-    semester INT NOT NULL,
-    lecture_hours INT DEFAULT 0
+    department_id INT REFERENCES departments(id)
 );
 
--- 10. Назначение преподавателей на курсы
-CREATE TABLE course_instructors (
-    course_id INT REFERENCES courses(course_id),
-    staff_id INT REFERENCES staff(staff_id),
-    PRIMARY KEY (course_id, staff_id)
+-- 11. Семестры (учебные годы); «текущий семестр» определяется по датам
+CREATE TABLE terms (
+    id SERIAL PRIMARY KEY,
+    year INT NOT NULL,
+    semester INT NOT NULL CHECK (semester IN (1, 2)),
+    date_start DATE NOT NULL,
+    date_end DATE NOT NULL,
+    UNIQUE (year, semester)
 );
 
--- 11. Успеваемость студентов
-CREATE TABLE academic_records (
-    record_id SERIAL PRIMARY KEY,
-    student_id INT REFERENCES students(student_id),
-    course_id INT REFERENCES courses(course_id),
-    grade NUMERIC(3, 2),
-    has_debt BOOLEAN DEFAULT FALSE,
-    semester INT NOT NULL
-);
-
--- 12. Аудиторный фонд
-CREATE TABLE rooms (
-    room_id SERIAL PRIMARY KEY,
-    building VARCHAR(50) NOT NULL,
+-- 12. Аудитории
+CREATE TABLE classrooms (
+    id SERIAL PRIMARY KEY,
+    building_id INT NOT NULL REFERENCES buildings(id),
     number VARCHAR(20) NOT NULL,
     capacity INT NOT NULL DEFAULT 0
 );
 
--- 13. Расписание занятий
-CREATE TABLE schedule_slots (
-    slot_id SERIAL PRIMARY KEY,
-    course_id INT NOT NULL REFERENCES courses(course_id),
-    group_id INT REFERENCES groups(group_id),
-    room_id INT REFERENCES rooms(room_id),
+-- 13. Занятия
+CREATE TABLE lessons (
+    id SERIAL PRIMARY KEY,
+    subject_id INT NOT NULL REFERENCES subjects(id),
+    classroom_id INT NOT NULL REFERENCES classrooms(id),
+    teacher_id INT NOT NULL REFERENCES staff(id),
+    term_id INT NOT NULL REFERENCES terms(id),
     weekday INT NOT NULL CHECK (weekday BETWEEN 1 AND 7),
     period INT NOT NULL CHECK (period BETWEEN 1 AND 8)
 );
 
--- 14. Контрольные цифры приёма по годам
-CREATE TABLE admission_plans (
-    plan_id SERIAL PRIMARY KEY,
-    year INT NOT NULL,
-    specialty_id INT NOT NULL REFERENCES specialties(specialty_id),
-    budget_places INT NOT NULL DEFAULT 0,
-    paid_places INT NOT NULL DEFAULT 0,
-    application_deadline DATE
+-- 14. Занятия ↔ группы (many-to-many: лекции идут для нескольких групп)
+CREATE TABLE lesson_group (
+    lesson_id INT NOT NULL REFERENCES lessons(id),
+    group_id INT NOT NULL REFERENCES groups(id),
+    PRIMARY KEY (lesson_id, group_id)
 );
 
--- 15. Фактическая статистика приёма по годам
-CREATE TABLE admission_stats (
-    stat_id SERIAL PRIMARY KEY,
-    year INT NOT NULL,
-    specialty_id INT NOT NULL REFERENCES specialties(specialty_id),
-    applications INT NOT NULL DEFAULT 0,
-    enrolled INT NOT NULL DEFAULT 0,
-    passing_score NUMERIC(3, 2),
-    avg_score NUMERIC(3, 2)
+-- 15. Успеваемость (оценка 0-5; NULL = не аттестован)
+CREATE TABLE marks (
+    id SERIAL PRIMARY KEY,
+    student_id INT NOT NULL REFERENCES students(id),
+    subject_id INT NOT NULL REFERENCES subjects(id),
+    term_id INT NOT NULL REFERENCES terms(id),
+    grade NUMERIC(3, 2) CHECK (grade BETWEEN 0 AND 5),
+    has_debt BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE (student_id, subject_id, term_id)
 );
 
--- 16. Учётные записи пользователей (логин/пароль для auth + маппинг на внутренние id)
+-- 16. Пользователи платформы (auth + маппинг на студента/сотрудника)
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    external_id VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(255) UNIQUE,              -- логин (может быть NULL на время перехода)
-    password_hash VARCHAR(255),             -- bcrypt-хэш пароля
-    role VARCHAR(20) NOT NULL,              -- applicant | student | teacher | admin
-    internal_id INT,                        -- student_id или staff_id
-    display_name VARCHAR(150),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    student_id INT REFERENCES students(id),
+    staff_id INT REFERENCES staff(id),
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CHECK (student_id IS NOT NULL OR staff_id IS NOT NULL)
 );
 
--- 17. Журнал аудита запросов
+-- 17. Приёмные кампании (по годам)
+CREATE TABLE admission_campaigns (
+    id SERIAL PRIMARY KEY,
+    year INT NOT NULL UNIQUE
+);
+
+-- 18. Приёмные комиссии (по факультету на кампанию)
+CREATE TABLE admission_committees (
+    id SERIAL PRIMARY KEY,
+    campaign_id INT NOT NULL REFERENCES admission_campaigns(id),
+    faculty_id INT NOT NULL REFERENCES faculties(id),
+    head_staff_id INT REFERENCES staff(id),
+    location VARCHAR(200),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    working_hours VARCHAR(100)
+);
+
+-- 19. Состав приёмных комиссий
+CREATE TABLE admission_committee_members (
+    committee_id INT NOT NULL REFERENCES admission_committees(id),
+    staff_id INT NOT NULL REFERENCES staff(id),
+    PRIMARY KEY (committee_id, staff_id)
+);
+
+-- 20. Контрольные цифры приёма
+CREATE TABLE admission_plans (
+    id SERIAL PRIMARY KEY,
+    campaign_id INT NOT NULL REFERENCES admission_campaigns(id),
+    specialization_id INT NOT NULL REFERENCES specializations(id),
+    budget_places INT NOT NULL DEFAULT 0,
+    paid_places INT NOT NULL DEFAULT 0,
+    application_deadline DATE,
+    UNIQUE (campaign_id, specialization_id)
+);
+
+-- 21. Фактическая статистика приёма
+CREATE TABLE admission_stats (
+    id SERIAL PRIMARY KEY,
+    campaign_id INT NOT NULL REFERENCES admission_campaigns(id),
+    specialization_id INT NOT NULL REFERENCES specializations(id),
+    applications INT NOT NULL DEFAULT 0,
+    enrolled INT NOT NULL DEFAULT 0,
+    passing_score NUMERIC(3, 2) CHECK (passing_score BETWEEN 0 AND 5),
+    avg_score NUMERIC(3, 2) CHECK (avg_score BETWEEN 0 AND 5),
+    UNIQUE (campaign_id, specialization_id)
+);
+
+-- 22. Журнал аудита шлюза (служебная таблица, не в домене)
 CREATE TABLE query_log (
     id BIGSERIAL PRIMARY KEY,
     ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-    role VARCHAR(20) NOT NULL,
+    role VARCHAR(20),
     user_id VARCHAR(100),
-    question TEXT,
     sql_query TEXT,
-    status VARCHAR(20) NOT NULL,
+    status VARCHAR(20),
     row_count INT,
     error TEXT,
     duration_ms NUMERIC(10, 3)
@@ -159,23 +202,32 @@ CREATE TABLE query_log (
 
 -- Обратные ссылки на staff (после создания всех таблиц)
 ALTER TABLE faculties
-    ADD CONSTRAINT fk_faculties_dean FOREIGN KEY (dean_id) REFERENCES staff(staff_id);
+    ADD CONSTRAINT fk_faculties_dean FOREIGN KEY (dean_id) REFERENCES staff(id);
 ALTER TABLE departments
-    ADD CONSTRAINT fk_departments_head FOREIGN KEY (head_id) REFERENCES staff(staff_id);
+    ADD CONSTRAINT fk_departments_head FOREIGN KEY (head_id) REFERENCES staff(id);
 
--- Индексы по внешним ключам
+-- Индексы по внешним ключам (нужны для RLS-join'ов)
 CREATE INDEX idx_departments_faculty ON departments(faculty_id);
-CREATE INDEX idx_staff_department ON staff(department_id);
-CREATE INDEX idx_specialties_faculty ON specialties(faculty_id);
-CREATE INDEX idx_groups_specialty ON groups(specialty_id);
-CREATE INDEX idx_students_specialty ON students(specialty_id);
+CREATE INDEX idx_specializations_faculty ON specializations(faculty_id);
+CREATE INDEX idx_groups_specialization ON groups(specialization_id);
 CREATE INDEX idx_students_group ON students(group_id);
-CREATE INDEX idx_courses_department ON courses(department_id);
-CREATE INDEX idx_course_instructors_staff ON course_instructors(staff_id);
-CREATE INDEX idx_academic_records_student ON academic_records(student_id);
-CREATE INDEX idx_academic_records_course ON academic_records(course_id);
-CREATE INDEX idx_academic_records_semester ON academic_records(semester);
-CREATE INDEX idx_schedule_slots_course ON schedule_slots(course_id);
-CREATE INDEX idx_schedule_slots_group ON schedule_slots(group_id);
-CREATE INDEX idx_admission_plans_specialty ON admission_plans(specialty_id);
-CREATE INDEX idx_admission_stats_specialty ON admission_stats(specialty_id);
+CREATE INDEX idx_students_status ON students(status_id);
+CREATE INDEX idx_staff_faculty ON staff(faculty_id);
+CREATE INDEX idx_staff_department ON staff(department_id);
+CREATE INDEX idx_staff_position ON staff(position_id);
+CREATE INDEX idx_subjects_department ON subjects(department_id);
+CREATE INDEX idx_lessons_subject ON lessons(subject_id);
+CREATE INDEX idx_lessons_classroom ON lessons(classroom_id);
+CREATE INDEX idx_lessons_teacher ON lessons(teacher_id);
+CREATE INDEX idx_lessons_term ON lessons(term_id);
+CREATE INDEX idx_lesson_group_group ON lesson_group(group_id);
+CREATE INDEX idx_marks_student ON marks(student_id);
+CREATE INDEX idx_marks_subject ON marks(subject_id);
+CREATE INDEX idx_marks_term ON marks(term_id);
+CREATE INDEX idx_admission_committees_campaign ON admission_committees(campaign_id);
+CREATE INDEX idx_admission_committees_faculty ON admission_committees(faculty_id);
+CREATE INDEX idx_admission_committee_members_staff ON admission_committee_members(staff_id);
+CREATE INDEX idx_admission_plans_campaign ON admission_plans(campaign_id);
+CREATE INDEX idx_admission_plans_specialization ON admission_plans(specialization_id);
+CREATE INDEX idx_admission_stats_campaign ON admission_stats(campaign_id);
+CREATE INDEX idx_admission_stats_specialization ON admission_stats(specialization_id);
