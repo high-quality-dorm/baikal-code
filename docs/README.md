@@ -52,36 +52,22 @@ make run                        # запустить приложение (FastA
 
 После этого откройте веб-интерфейс (см. ниже) или обращайтесь к API напрямую.
 
-## Первый вход
+## Вход
 
-Хранилище учётных записей стартует пустым. Первого администратора создаёт
-эндпоинт `POST /api/v1/auth/bootstrap-admin`:
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap-admin \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"secret"}'
-```
-
-Дальше админ управляет учётками через `POST /api/v1/auth/users`
-(при создании указывает `student_id`/`staff_id` — связку с доменной сущностью,
-через которую RLS вычисляет доступ):
+Учётные записи создаются вне приложения (сид `make seed` даёт демо-пользователей
+из [seed.md](seed.md): `demo_student@example.com`, `demo_admin@example.com` и др.,
+пароль `password123`; в проде — вручную в БД). Вход по логину/паролю —
+`POST /api/v1/auth/login`, он возвращает JWT access-токен (RS256), который
+используется для `/api/v1/ask`:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/api/v1/auth/users \
+curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <access_token>" \
-  -d '{"email":"student@example.com","password":"secret","student_id":1}'
+  -d '{"email":"demo_student@example.com","password":"password123"}'
 ```
 
-> Примечание: пакет приложения `app` сейчас заморожен (исключён из проверок) и
-> будет перестроен под новую set-based модель: прямой вызов пакета `db`
-> (фасад `Gateway`) вместо MCP-клиента, роль резолвится в момент логина через
-> `db.resolve_role`, `student_id`/`staff_id` вместо `internal_id`. База данных и
-> пакет `db` уже переведены на эту модель (см. [architecture.md](architecture.md)).
-
-Вход по логину/паролю — `POST /api/v1/auth/login`, он возвращает
-JWT access-токен (RS256), который используется для `/api/v1/ask`.
+Токен несёт только номер учётки (`sub`); роль и доступ резолвятся на каждый
+запрос через пакет `db` (см. [architecture.md](architecture.md)).
 
 ## Веб-интерфейс (frontend)
 

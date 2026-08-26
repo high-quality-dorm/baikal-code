@@ -37,8 +37,9 @@ PostgreSQL (roles + set-based RLS)
 идёт только через `db`, где сосредоточены безопасность, валидация, маскирование
 схемы и аудит.
 
-> Примечание: пакет `app` сейчас заморожен (исключён из проверок) и будет
-> перестроен с нуля под описанную выше set-based модель.
+> Примечание: пакет `app` перестроен под set-based модель доступа: прямой вызов
+> фасада `db.Gateway` (без MCP), роль резолвится на каждый запрос, гость работает
+> через `user_id=None`.
 
 ## Пакеты (uv workspace)
 
@@ -91,37 +92,47 @@ PostgreSQL (roles + set-based RLS)
 - CRUD учёток: `get_user_by_login`, `get_user`, `list_users`, `create_user`,
   `update_user`, `deactivate_user`, `has_admin`.
 
-### packages/app (заморожен)
-FastAPI-приложение: конвейер text-to-SQL поверх `db`. **Временно исключён из
-проверок** (`make format`/`check`/`test` работают по `packages/db` и
-`tests/db/`), будет перестроен с нуля под set-based модель доступа.
+### packages/app
+FastAPI-приложение: тонкий HTTP-слой поверх `db`. Всего три эндпоинта:
 
-API-схемы — в `packages/app/src/app/api/schemas.py`:
-`Question`, `Answer`, `QueryMeta`.
+- `POST /api/v1/auth/login` — вход по email/паролю → JWT (`sub` = номер учётки,
+  `users.id`). Роль в токен **не кладётся**: она резолвится на каждый запрос.
+- `GET /api/v1/auth/users/me` — текущая учётка (`Me`) с производной ролью
+  (для бейджа в интерфейсе).
+- `POST /api/v1/ask` — конвейер text-to-SQL; **гость разрешён** (без токена →
+  `user_id=None`).
 
-**Auth-подсистема** (`packages/app/src/app/auth/` + `core/security.py` + `services/`):
-- вход по логину/паролю → JWT access-токен (RS256), подписанный RSA-ключом;
-  идентификатор учётки (`sub`) берётся из токена; пароли хэшируются bcrypt;
-  `sub` = номер учётки (`users.id`);
-- эндпоинты `/api/v1/auth/login` и `/api/v1/auth/bootstrap-admin` (создание первого
-  админа, только если админов ещё нет);
-- администратор управляет учётными записями: `POST/GET/PATCH/DELETE /api/v1/auth/users`;
-  при создании учётки админ указывает `student_id`/`staff_id` — связку с доменной
-  сущностью, через которую RLS вычисляет доступ;
-- хранилище учёток — `UserCredentialsStore` (протокол); реализация
-  `DbUserCredentialsStore` читает/пишет `users` через пакет `db`.
+Учётные записи и их связки `student_id`/`staff_id` заводятся **вне приложения**
+(сид / руками в БД): у app нет ни управления учётками, ни write-доступа к
+данным. «Админ» в чате — это роль доступа по RLS (видит все строки), а не
+административная панель.
 
-**Конвейер text-to-SQL и REST-слой**:
-- `app/llm/` — конфигурируемый OpenAI-совместимый LLM-клиент
-  (`langchain-openai`, `ChatOpenAI`; `llm_base_url`/`llm_api_key`/`llm_model`/
-  `llm_temperature` из `Settings`) и системные промпты (`prompts.py`: только
-  read-only SELECT, лимиты, PII — второй слой защиты поверх шлюза);
-- `app/services/pipeline.py` — конвейер: схема под пользователя → генерация SQL
-  через LLM → исполнение через пакет `db` (с `users.id`) → пересказ результата
-  по-русски вторым LLM-вызовом → `Answer` с метаданными запроса (`QueryMeta`).
-  Ошибка шлюза (`GatewayError`) возвращается пользователю без ретрая LLM;
-- `POST /api/v1/ask` (`Question` + auth) → `Answer`; `user_id` берётся из JWT
-  (`sub` = номер учётки), контекст доступа задаёт пакет `db` по RLS.
+Структура (`packages/app/src/app/`):
+
+- `main.py` — `create_app()`: один `Gateway`, контейнер `AppContext(gateway,
+  auth, pipeline)`, lifespan закрывает `Gateway`. Инъекция — через override
+  `get_context` (единственный шов DI, используется и тестами).
+- `context.py` — `AppContext` (dataclass) и DI-хук `get_context`.
+- `auth/schemas.py` — `LoginRequest`, `TokenResponse`, `Me`.
+- `auth/deps.py` — `get_current_user` (обязательная auth: нет/невалидный токен
+  или неактивная учётка → 401), `get_optional_context` (гость при
+  отсутствии/невалидном токене; валидный токен неактивной учётки → 401).
+  Идентичность и роль резолвятся через `db.resolve_identity`/`resolve_role`.
+- `auth/router.py` — `/login`, `/users/me`.
+- `services/auth.py` — `AuthService(gateway)`: `authenticate` (bcrypt с
+  dummy-hash против timing-оракла, email нормализуется), `get_me`.
+- `services/pipeline.py` — `Pipeline(gateway, llm)`: `ask(question, user_id,
+  role)` → `get_schema(user_id)` → LLM-генерация SQL → `execute_query(sql,
+  user_id)` → пересказ → `Answer`/`QueryMeta`. Ошибки шлюза/LLM — наверх без
+  ретрая (ADR 24).
+- `llm/` — `llm.py` (клиент), `prompts.py` (промпты), `render.py`
+  (`schema_to_text`: читаемое описание схемы для LLM + блок identity).
+- `api/ask.py` — `POST /ask` через `get_optional_context`; `GatewayError`/
+  `LLMError` → 502.
+- `core/` — `config.py` (JWT + LLM настройки), `security.py` (bcrypt + JWT RS256).
+
+App использует из `db` только: `get_user_by_login`, `get_user`,
+`resolve_identity`, `resolve_role`, `get_schema`, `execute_query`.
 
 ### frontend (каталог `frontend/`)
 React (Vite) SPA — веб-интерфейс по [design.md](design.md). Страницы: лендинг
@@ -131,11 +142,12 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 - **Dev-прокси:** `vite.config.js` проксирует `/api` на FastAPI (`:8000`),
   поэтому в dev не нужен CORS. В проде статика раздаётся FastAPI.
 - **API-клиент** (`src/lib/api.js`): `/auth/login`, `/auth/users/me`,
-  `/ask`. Авторизованные пользователи ходят в `/ask` с Bearer-токеном —
-  `role`/`user_id` бэкенд берёт из JWT.
+  `/ask`. Авторизованные пользователи ходят в `/ask` с Bearer-токеном;
+  бэкенд берёт `user_id` из JWT, а роль резолвит сам (в токене её нет).
 - **Mock-ассистент** (`src/lib/mock.js`): используется как фолбэк, когда
-  бэкенд недоступен (сеть/прокси) и для гостевой сессии (гость не имеет
-  токена, а `/ask` требует авторизацию). Отвечает локально, детерминированно,
+  бэкенд недоступен (сеть/прокси) и для гостевой сессии (фронтенд пока не
+  подключён к реальному `/ask` гостя — бэкенд уже принимает запросы без
+  токена, подключение запланировано). Отвечает локально, детерминированно,
   по фактам засеянной базы (см. [seed.md](seed.md)). Формат ответа совпадает
   с `Answer`/`QueryMeta`.
 - **Гостевой доступ:** неавторизованный пользователь работает в отдельной

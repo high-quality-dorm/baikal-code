@@ -35,9 +35,11 @@
 | Модели контракта db (Identity, QueryResult, SchemaDescription, UserRecord) | `packages/db/src/db/models.py`            |
 | Модули пакета db (access/identity/validate/schema/audit/userstore)  | `packages/db/src/db/`                       |
 | Фасад db (get_schema, execute_query, CRUD учёток)                | `packages/db/src/db/gateway.py`             |
-| API-схемы (Question, Answer, QueryMeta)                | `packages/app/src/app/api/schemas.py`        |
-| Конвейер text-to-SQL (`Pipeline`, `POST /api/v1/ask`)  | `packages/app/src/app/services/pipeline.py`, `api/ask.py` |
-| LLM-клиент (ChatOpenAI) и промпты                      | `packages/app/src/app/llm/`                   |
+| API-схемы (Question, Answer, QueryMeta; auth: LoginRequest, TokenResponse, Me) | `packages/app/src/app/api/schemas.py`, `auth/schemas.py` |
+| Auth-зависимости и роутер (login, /users/me), резолюция роли per-request | `packages/app/src/app/auth/deps.py`, `auth/router.py`, `services/auth.py` |
+| Конвейер text-to-SQL (`Pipeline`, `POST /api/v1/ask`, гость разрешён) | `packages/app/src/app/services/pipeline.py`, `api/ask.py` |
+| LLM-клиент (ChatOpenAI), промпты, рендер схемы для LLM | `packages/app/src/app/llm/` |
+| Контейнер сервисов и шов DI (`AppContext`, `get_context`) | `packages/app/src/app/context.py` |
 | Схема БД (22 таблицы)                                  | `db/01_schema.sql`                           |
 | Роли и права (app_ro/app_service), set-based RLS       | `db/02_roles.sql`, `db/03_rls.sql`          |
 | Генератор синтетики                                   | `scripts/seed.py`                            |
