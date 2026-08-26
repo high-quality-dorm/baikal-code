@@ -95,36 +95,52 @@
         <div class="kicker">Агент</div>
         <h2>Агент-помощник, а не конвейер</h2>
         <div class="content">
-          <div class="pipeline">
+          <div class="pipeline" style="flex:1;">
             <div class="stage">
+              <div class="stage-num">01</div>
               <div class="stage-title">Понял</div>
               <div class="stage-sub">вопрос по-русски</div>
             </div>
             <span class="p-arrow">→</span>
             <div class="stage">
+              <div class="stage-num">02</div>
               <div class="stage-title">Написал SQL</div>
               <div class="stage-sub">по схеме базы</div>
             </div>
             <span class="p-arrow">→</span>
             <div class="stage">
+              <div class="stage-num">03</div>
               <div class="stage-title">Выполнил</div>
               <div class="stage-sub">через шлюз</div>
             </div>
             <span class="p-arrow">→</span>
             <div class="stage">
+              <div class="stage-num">04</div>
               <div class="stage-title">Увидел ошибку</div>
               <div class="stage-sub">исправил и повторил</div>
             </div>
             <span class="p-arrow">→</span>
             <div class="stage accent">
+              <div class="stage-num">05</div>
               <div class="stage-title">Ответил</div>
               <div class="stage-sub">и объяснил, что сделал</div>
             </div>
           </div>
-          <div class="pill-row">
-            <span class="pill">Стриминг: видна каждая мысль</span>
-            <span class="pill">Отвечает только по данным</span>
-            <span class="pill">Самокоррекция</span>
+          <div class="split">
+            <div class="col tint">
+              <div class="col-head">
+                <i class="fa-solid fa-wave-square"></i>
+                <span class="col-label">Стриминг</span>
+              </div>
+              <p class="note">Каждый шаг виден в реальном времени: статусы, SQL, токены ответа</p>
+            </div>
+            <div class="col">
+              <div class="col-head">
+                <i class="fa-solid fa-rotate"></i>
+                <span class="col-label">Самокоррекция</span>
+              </div>
+              <p class="note">Ошибка шлюза возвращается агенту — он видит её, исправляет SQL и повторяет</p>
+            </div>
           </div>
           <p class="punch">Конвейер выдаёт ответ один раз. <span class="hl">Агент доводит его до конца.</span></p>
         </div>
@@ -260,7 +276,7 @@
               <p>NDJSON-стриминг: первый токен сразу, виден каждый шаг</p>
             </div>
           </div>
-          <p class="note">За 5 дней: схема с ролями и RLS · шлюз · агент · чат · виджет · деплой</p>
+          <p class="note">За 4 дня: схема с ролями и RLS · шлюз · агент · чат · виджет · деплой</p>
         </div>
       </section>
 
