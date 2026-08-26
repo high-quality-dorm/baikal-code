@@ -117,8 +117,22 @@
   justify-content: flex-start;
 }
 
-.widget__msg-bubble {
+.widget__msg-body {
+  display: grid;
+  gap: 6px;
   max-width: 85%;
+}
+
+.widget__msg--user .widget__msg-body {
+  justify-items: end;
+}
+
+.widget__msg--assistant .widget__msg-body {
+  justify-items: start;
+}
+
+.widget__msg-bubble {
+  max-width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius-md);
   font-size: 14px;

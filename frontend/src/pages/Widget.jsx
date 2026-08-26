@@ -196,36 +196,38 @@ export default function Widget() {
                       m.meta?.error ? " widget__msg--error" : ""
                     }`}
                   >
-                    <div className="widget__msg-bubble">
-                      {m.meta?.error ? (
-                        <strong>Не удалось выполнить запрос.</strong>
-                      ) : isUser ? (
-                        m.text
-                      ) : m.text ? (
-                        <Markdown text={m.text} />
-                      ) : streaming ? (
-                        <span className="typing">
-                          <span />
-                          <span />
-                          <span />
-                        </span>
-                      ) : null}
-                      {m.meta?.error && (
-                        <div style={{ marginTop: 6 }}>{m.meta.error}</div>
-                      )}
-                    </div>
-                    {!isUser && m.meta?.sql && (
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <SqlDisclosure sql={m.meta.sql} meta={m.meta} />
-                        {m.meta?.row_count !== undefined && !m.meta?.error && (
-                          <div className="widget__msg-meta">
-                            <span>{m.meta.row_count} стр.</span>
-                            <span>{m.meta.duration_ms} ms</span>
-                            {m.meta.truncated && <span>обрезка</span>}
-                          </div>
+                    <div className="widget__msg-body">
+                      <div className="widget__msg-bubble">
+                        {m.meta?.error ? (
+                          <strong>Не удалось выполнить запрос.</strong>
+                        ) : isUser ? (
+                          m.text
+                        ) : m.text ? (
+                          <Markdown text={m.text} />
+                        ) : streaming ? (
+                          <span className="typing">
+                            <span />
+                            <span />
+                            <span />
+                          </span>
+                        ) : null}
+                        {m.meta?.error && (
+                          <div style={{ marginTop: 6 }}>{m.meta.error}</div>
                         )}
                       </div>
-                    )}
+                      {!isUser && m.meta?.sql && (
+                        <div style={{ display: "grid", gap: 6 }}>
+                          <SqlDisclosure sql={m.meta.sql} meta={m.meta} />
+                          {m.meta?.row_count !== undefined && !m.meta?.error && (
+                            <div className="widget__msg-meta">
+                              <span>{m.meta.row_count} стр.</span>
+                              <span>{m.meta.duration_ms} ms</span>
+                              {m.meta.truncated && <span>обрезка</span>}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })
