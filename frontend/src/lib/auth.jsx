@@ -49,6 +49,26 @@ export function AuthProvider({ children }) {
     hydrate();
   }, [session]);
 
+  // Синхронизация между окнами/iframe одного origin: вход/выход в другой
+  // вкладке подхватывается (нужно для виджета, встроенного через iframe).
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key !== STORAGE_KEY) return;
+      if (e.newValue) {
+        try {
+          setSession(JSON.parse(e.newValue));
+        } catch {
+          /* невалидное значение — игнорируем */
+        }
+      } else {
+        setSession(null);
+        setUser(null);
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   async function signIn(email, password) {
     const token = await login(email, password);
     const next = { accessToken: token.access_token };
