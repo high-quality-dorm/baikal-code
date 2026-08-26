@@ -168,6 +168,9 @@ export default function Chat() {
         onToken: (delta) => {
           streamed = true;
           answerText += delta;
+          // LLM перед вызовом тула может стримить пустые токены ("\n\n") —
+          // они не должны давать отступ в начале ответа.
+          answerText = answerText.trimStart();
           // Начался текст ответа — статусная строка этапа больше не нужна.
           setStatus(null);
           setMessages((m) =>
