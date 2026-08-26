@@ -137,7 +137,10 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
   - `prompts.py` — системный промпт (read-only SELECT, LIMIT, самокоррекция)
     + `build_system_prompt(schema_text, role, can_see_pii)`: правило PII
     выбирается по `can_see_pii` — разрешено в рамках RLS-скоупа или запрет
-    «только агрегаты» для гостя (см. ADR 38);
+    «только агрегаты» для гостя (см. ADR 38); блок `_ROLE_ACCESS` описывает
+    скоуп доступа по роли (гость/student/teacher/head/dean/admin, неизвестная
+    роль → гость), а базовые правила инструктируют подстраивать запрос под
+    скоуп и брать общую статистику по студентам из публичных вью `v_students_*`;
   - `tools.py` — `EXECUTE_QUERY_SCHEMA` и `ToolExecutor(gateway, user_id)`
     (`ToolResult(content, meta)`; `GatewayError` → текст ошибки);
   - `agent.py` — `Agent.stream(question, user_id, role, can_see_pii)` — цикл
