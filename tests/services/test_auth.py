@@ -1,144 +1,100 @@
+"""Тесты AuthService поверх фейкового шлюза."""
+
+from __future__ import annotations
+
 import pytest
 
-from db_mcp.roles import BusinessRole
-
-from app.auth.schemas import Credentials, UserCreate, UserUpdate
-from app.core.security import hash_password, decode_access_token
-from app.services.auth import (
-    AdminExistsError,
-    AuthenticationError,
-    AuthService,
-    DuplicateLoginError,
-)
-from app.services.providers import InMemoryAuthStore
+from app.core.security import decode_access_token, hash_password
+from app.services.auth import AuthenticationError, AuthService
+from db.models import Identity, UserRecord
+from tests.fakes import FakeGateway
 
 pytestmark = pytest.mark.usefixtures("rsa_keys")
 
 
-def make_service():
-    return AuthService(InMemoryAuthStore())
+def _service() -> tuple[AuthService, FakeGateway]:
+    gw = FakeGateway()
+    return AuthService(gw), gw
+
+
+def _add(
+    gw: FakeGateway,
+    user_id: int = 1,
+    email: str = "a@b.c",
+    password: str = "pw123456",
+    is_active: bool = True,
+    role: str = "student",
+    student_id: int | None = 7,
+    staff_id: int | None = None,
+) -> None:
+    gw.add_user(
+        UserRecord(
+            id=user_id,
+            student_id=student_id,
+            staff_id=staff_id,
+            email=email,
+            password_hash=hash_password(password),
+            is_active=is_active,
+        ),
+        identity=Identity(
+            user_id=user_id, student_id=student_id, staff_id=staff_id
+        ),
+        role=role,
+    )
 
 
 @pytest.mark.anyio
 async def test_authenticate_success():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="admin", is_active=True))
+    svc, gw = _service()
+    _add(gw)
     token = await svc.authenticate("a@b.c", "pw123456")
+    assert decode_access_token(token.access_token)["sub"] == "1"
+
+
+@pytest.mark.anyio
+async def test_authenticate_normalizes_email():
+    svc, gw = _service()
+    _add(gw)
+    token = await svc.authenticate("  A@B.c ", "pw123456")
     assert token.access_token
-    assert token.role == "admin"
 
 
 @pytest.mark.anyio
 async def test_authenticate_wrong_password():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="admin", is_active=True))
+    svc, gw = _service()
+    _add(gw)
     with pytest.raises(AuthenticationError):
         await svc.authenticate("a@b.c", "badpass")
 
 
 @pytest.mark.anyio
 async def test_authenticate_inactive():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="admin", is_active=False))
+    svc, gw = _service()
+    _add(gw, is_active=False)
     with pytest.raises(AuthenticationError):
         await svc.authenticate("a@b.c", "pw123456")
 
 
 @pytest.mark.anyio
 async def test_authenticate_unknown_login():
-    svc = make_service()
+    svc, gw = _service()
     with pytest.raises(AuthenticationError):
         await svc.authenticate("nobody", "whatever1")
 
 
 @pytest.mark.anyio
-async def test_bootstrap_admin_creates_when_empty():
-    svc = make_service()
-    out = await svc.bootstrap_admin("admin@x.ru", "admin12345")
-    assert out.role == BusinessRole.ADMIN.value
-    assert out.internal_id is None
+async def test_get_me_returns_record_with_role():
+    svc, gw = _service()
+    _add(gw, role="admin", student_id=None, staff_id=1)
+    me = await svc.get_me(1)
+    assert me is not None
+    assert me.id == 1
+    assert me.email == "a@b.c"
+    assert me.role == "admin"
+    assert me.staff_id == 1
 
 
 @pytest.mark.anyio
-async def test_bootstrap_admin_conflict():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="admin", is_active=True))
-    with pytest.raises(AdminExistsError):
-        await svc.bootstrap_admin("admin2@x.ru", "admin12345")
-
-
-@pytest.mark.anyio
-async def test_create_user_duplicate():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="student", is_active=True))
-    with pytest.raises(DuplicateLoginError):
-        await svc.create_user(UserCreate(email="a@b.c", password="pw123456", role=BusinessRole.STUDENT))
-
-
-@pytest.mark.anyio
-async def test_create_user_persists_internal_id():
-    svc = make_service()
-    out = await svc.create_user(UserCreate(
-        email="stud@x.ru", password="stud12345", role=BusinessRole.STUDENT, internal_id=7))
-    assert out.internal_id == 7
-
-
-@pytest.mark.anyio
-async def test_create_user_internal_id_defaults_to_none():
-    svc = make_service()
-    out = await svc.create_user(UserCreate(
-        email="stud@x.ru", password="stud12345", role=BusinessRole.STUDENT))
-    assert out.internal_id is None
-
-
-@pytest.mark.anyio
-async def test_create_user_duplicate_external_id():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="student", is_active=True))
-    with pytest.raises(DuplicateLoginError):
-        await svc.create_user(UserCreate(
-            email="other@b.c", password="pw123456", role=BusinessRole.STUDENT, external_id="e1"))
-
-
-@pytest.mark.anyio
-async def test_token_sub_is_credentials_id_even_with_internal_id():
-    svc = make_service()
-    saved = await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c", internal_id=999,
-        password_hash=hash_password("pw123456"), role="admin", is_active=True))
-    token = await svc.authenticate("a@b.c", "pw123456")
-    payload = decode_access_token(token.access_token)
-    assert payload["sub"] == str(saved.id)
-
-
-@pytest.mark.anyio
-async def test_update_user_password():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("oldpass1"), role="student", is_active=True))
-    await svc.update_user(1, UserUpdate(password="newpass1"))
-    assert (await svc.authenticate("a@b.c", "newpass1")).role == "student"
-
-
-@pytest.mark.anyio
-async def test_deactivate_user():
-    svc = make_service()
-    await svc.store.add(Credentials(
-        id=None, external_id="e1", email="a@b.c",
-        password_hash=hash_password("pw123456"), role="student", is_active=True))
-    assert await svc.deactivate_user(1) is True
-    with pytest.raises(AuthenticationError):
-        await svc.authenticate("a@b.c", "pw123456")
+async def test_get_me_unknown_returns_none():
+    svc, gw = _service()
+    assert await svc.get_me(99) is None

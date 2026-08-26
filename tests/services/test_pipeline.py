@@ -3,45 +3,29 @@
 from __future__ import annotations
 
 import pytest
+from db.gateway import GatewayError
+from db.models import (
+    ColumnInfo,
+    ForeignKey,
+    Identity,
+    QueryResult,
+    SchemaDescription,
+    TableInfo,
+)
 
 from app.api.schemas import Answer
-from app.gateway import GatewayError
+from app.llm.render import schema_to_text
 from app.services.pipeline import Pipeline
-
-
-class FakeGateway:
-    """Фейк шлюза db_mcp: запоминает вызовы, отдаёт фиксированный результат."""
-
-    def __init__(self, error: Exception | None = None) -> None:
-        self.error = error
-        self.calls: list[tuple[str, str, str]] = []
-        self.schema_calls: list[str] = []
-
-    async def get_schema(self, role: str) -> str:
-        self.schema_calls.append(role)
-        return '{"role": "student", "tables": []}'
-
-    async def execute_query(self, sql: str, role: str, user_id: str) -> dict:
-        self.calls.append((sql, role, user_id))
-        if self.error is not None:
-            raise self.error
-        return {
-            "columns": ["student_id"],
-            "rows": [[7]],
-            "row_count": 1,
-            "truncated": False,
-            "duration_ms": 12.3,
-        }
-
-    async def close(self) -> None:
-        pass
+from tests.fakes import FakeGateway
 
 
 class FakeLLM:
     """Фейк LLM: детерминированный SQL и пересказ."""
 
-    async def generate_sql(self, question: str, schema: str, role: str) -> str:
-        return "SELECT student_id FROM students"
+    async def generate_sql(
+        self, question: str, schema: str, role: str | None
+    ) -> str:
+        return "SELECT count(*) FROM students"
 
     async def answer(
         self,
@@ -50,30 +34,99 @@ class FakeLLM:
         columns: list[str],
         rows: list[list[object]],
     ) -> str:
-        return "Нашёл одного студента"
+        return "Ответ"
+
+
+def _schema() -> SchemaDescription:
+    return SchemaDescription(
+        identity=Identity(user_id=1, student_id=7, staff_id=None),
+        tables=[
+            TableInfo(
+                name="students",
+                title="Профили студентов",
+                description="Профили студентов.",
+                primary_key=["id"],
+                foreign_keys=[
+                    ForeignKey(
+                        column="group_id",
+                        references_table="groups",
+                        references_column="id",
+                    )
+                ],
+                columns=[
+                    ColumnInfo(name="id", type="integer", nullable=False),
+                    ColumnInfo(
+                        name="name",
+                        type="character varying",
+                        nullable=True,
+                        sensitive=True,
+                    ),
+                ],
+            )
+        ],
+    )
+
+
+def _gateway() -> FakeGateway:
+    gw = FakeGateway()
+    gw.schema = _schema()
+    gw.result = QueryResult(
+        columns=["count"],
+        rows=[[7]],
+        row_count=1,
+        truncated=False,
+        duration_ms=12.3,
+    )
+    return gw
 
 
 @pytest.mark.anyio
-async def test_ask_full_flow() -> None:
-    gateway = FakeGateway()
-    pipeline = Pipeline(gateway, FakeLLM())
+async def test_ask_full_flow():
+    gw = _gateway()
+    pipeline = Pipeline(gw, FakeLLM())
 
-    answer = await pipeline.ask("Сколько студентов?", "student", "3")
+    answer = await pipeline.ask("Сколько студентов?", 1, "student")
 
     assert isinstance(answer, Answer)
-    assert answer.text == "Нашёл одного студента"
-    assert answer.meta.sql == "SELECT student_id FROM students"
+    assert answer.text == "Ответ"
+    assert answer.meta.sql == "SELECT count(*) FROM students"
     assert answer.meta.row_count == 1
     assert answer.meta.truncated is False
     assert answer.meta.duration_ms == 12.3
-    assert gateway.schema_calls == ["student"]
-    assert gateway.calls == [("SELECT student_id FROM students", "student", "3")]
+    assert gw.get_schema_calls == [1]
+    assert gw.execute_calls == [("SELECT count(*) FROM students", 1)]
 
 
 @pytest.mark.anyio
-async def test_ask_gateway_error_propagates() -> None:
-    gateway = FakeGateway(error=GatewayError("Доступ запрещён"))
-    pipeline = Pipeline(gateway, FakeLLM())
+async def test_ask_guest_uses_none():
+    gw = _gateway()
+    pipeline = Pipeline(gw, FakeLLM())
+
+    answer = await pipeline.ask("Сколько мест?", None, None)
+
+    assert answer.meta.sql == "SELECT count(*) FROM students"
+    assert gw.get_schema_calls == [None]
+    assert gw.execute_calls == [("SELECT count(*) FROM students", None)]
+
+
+@pytest.mark.anyio
+async def test_ask_gateway_error_propagates():
+    gw = _gateway()
+    gw.gateway_error = GatewayError("Доступ запрещён")
+    pipeline = Pipeline(gw, FakeLLM())
 
     with pytest.raises(GatewayError):
-        await pipeline.ask("Сколько студентов?", "student", "3")
+        await pipeline.ask("Сколько студентов?", 1, "student")
+
+
+def test_schema_to_text_renders_identity_and_tables():
+    text = schema_to_text(_schema())
+    assert "user_id=1" in text
+    assert "Таблица students" in text
+    assert "[PII]" in text
+    assert "FK: group_id -> groups.id" in text
+
+
+def test_schema_to_text_guest():
+    text = schema_to_text(SchemaDescription(identity=None, tables=[]))
+    assert "гость" in text

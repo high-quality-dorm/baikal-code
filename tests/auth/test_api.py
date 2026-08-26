@@ -1,100 +1,98 @@
+"""Тесты HTTP-роутера auth: вход и /users/me."""
+
+from __future__ import annotations
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.context import AppContext, get_context
 from app.core.security import hash_password
-from app.auth.schemas import Credentials
-from app.services.providers import InMemoryAuthStore
+from app.main import create_app
 from app.services.auth import AuthService
+from app.services.pipeline import Pipeline
+from db.models import Identity, UserRecord
+from tests.fakes import FakeGateway, StubLLM
 
 pytestmark = pytest.mark.usefixtures("rsa_keys")
 
 
-def make_client():
-    app = create_app(auth_store=InMemoryAuthStore())
+def _make_client(gw: FakeGateway) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_context] = lambda: AppContext(
+        gateway=gw, auth=AuthService(gw), pipeline=Pipeline(gw, StubLLM())
+    )
     return TestClient(app)
 
 
+def _gateway_with_admin() -> FakeGateway:
+    gw = FakeGateway()
+    gw.add_user(
+        UserRecord(
+            id=5,
+            student_id=None,
+            staff_id=1,
+            email="demo_admin@example.com",
+            password_hash=hash_password("password123"),
+            is_active=True,
+        ),
+        identity=Identity(user_id=5, student_id=None, staff_id=1),
+        role="admin",
+    )
+    return gw
+
+
+def _login_headers(client: TestClient) -> dict[str, str]:
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "demo_admin@example.com", "password": "password123"},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_login_success():
-    client = make_client()
-    client.post("/api/v1/auth/bootstrap-admin",
-                json={"email": "admin@x.ru", "password": "admin12345"})
-    resp = client.post("/api/v1/auth/login",
-                       json={"email": "admin@x.ru", "password": "admin12345"})
+    client = _make_client(_gateway_with_admin())
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "demo_admin@example.com", "password": "password123"},
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["access_token"]
-    assert body["role"] == "admin"
+    assert body["token_type"] == "bearer"
 
 
 def test_login_wrong_password():
-    client = make_client()
-    client.post("/api/v1/auth/bootstrap-admin",
-                json={"email": "admin@x.ru", "password": "admin12345"})
-    resp = client.post("/api/v1/auth/login",
-                       json={"email": "admin@x.ru", "password": "wrongpass"})
+    client = _make_client(_gateway_with_admin())
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "demo_admin@example.com", "password": "wrongpass"},
+    )
     assert resp.status_code == 401
 
 
-def test_bootstrap_admin_only_once():
-    client = make_client()
-    r1 = client.post("/api/v1/auth/bootstrap-admin",
-                     json={"email": "a@x.ru", "password": "admin12345"})
-    r2 = client.post("/api/v1/auth/bootstrap-admin",
-                     json={"email": "b@x.ru", "password": "admin12345"})
-    assert r1.status_code == 200
-    assert r2.status_code == 409
+def test_login_unknown_email():
+    client = _make_client(_gateway_with_admin())
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@example.com", "password": "password123"},
+    )
+    assert resp.status_code == 401
 
 
-def test_admin_can_create_user():
-    client = make_client()
-    client.post("/api/v1/auth/bootstrap-admin",
-                json={"email": "admin@x.ru", "password": "admin12345"})
-    login = client.post("/api/v1/auth/login",
-                        json={"email": "admin@x.ru", "password": "admin12345"}).json()
-    headers = {"Authorization": f"Bearer {login['access_token']}"}
-    resp = client.post("/api/v1/auth/users",
-                       json={"email": "stud@x.ru", "password": "stud12345", "role": "student"},
-                       headers=headers)
-    assert resp.status_code == 201
+def test_users_me():
+    client = _make_client(_gateway_with_admin())
+    headers = _login_headers(client)
+    resp = client.get("/api/v1/auth/users/me", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == 5
+    assert body["role"] == "admin"
+    assert body["staff_id"] == 1
 
 
-def test_admin_can_create_user_with_internal_id():
-    client = make_client()
-    client.post("/api/v1/auth/bootstrap-admin",
-                json={"email": "admin@x.ru", "password": "admin12345"})
-    login = client.post("/api/v1/auth/login",
-                        json={"email": "admin@x.ru", "password": "admin12345"}).json()
-    headers = {"Authorization": f"Bearer {login['access_token']}"}
-    resp = client.post("/api/v1/auth/users",
-                       json={"email": "stud@x.ru", "password": "stud12345",
-                             "role": "student", "internal_id": 7},
-                       headers=headers)
-    assert resp.status_code == 201
-    assert resp.json()["internal_id"] == 7
-
-
-def test_non_admin_cannot_create_user():
-    client = make_client()
-    client.post("/api/v1/auth/bootstrap-admin",
-                json={"email": "admin@x.ru", "password": "admin12345"})
-    login = client.post("/api/v1/auth/login",
-                        json={"email": "admin@x.ru", "password": "admin12345"}).json()
-    # create a student via admin
-    headers = {"Authorization": f"Bearer {login['access_token']}"}
-    client.post("/api/v1/auth/users",
-                json={"email": "stud@x.ru", "password": "stud12345", "role": "student"},
-                headers=headers)
-    slogin = client.post("/api/v1/auth/login",
-                         json={"email": "stud@x.ru", "password": "stud12345"}).json()
-    sheaders = {"Authorization": f"Bearer {slogin['access_token']}"}
-    resp = client.post("/api/v1/auth/users",
-                       json={"email": "x@x.ru", "password": "xxxx12345", "role": "student"},
-                       headers=sheaders)
-    assert resp.status_code == 403
-
-
-def test_anonymous_gets_401_on_admin_endpoint():
-    client = make_client()
-    resp = client.get("/api/v1/auth/users")
+def test_users_me_requires_auth():
+    client = _make_client(_gateway_with_admin())
+    resp = client.get("/api/v1/auth/users/me")
     assert resp.status_code == 401

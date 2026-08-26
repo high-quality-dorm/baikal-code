@@ -1,9 +1,7 @@
 from pydantic import ValidationError
 import pytest
 
-from db_mcp.roles import BusinessRole
-
-from app.auth.schemas import LoginRequest, UserCreate, UserOut
+from app.auth.schemas import LoginRequest, Me, TokenResponse
 
 
 def test_login_request_valid():
@@ -11,38 +9,25 @@ def test_login_request_valid():
     assert req.email == "a@b.c"
 
 
-def test_user_create_requires_role():
-    user = UserCreate(email="a@b.c", password="password", role=BusinessRole.ADMIN)
-    assert user.role is BusinessRole.ADMIN
-
-
-def test_user_create_accepts_internal_id():
-    user = UserCreate(
-        email="a@b.c",
-        password="password",
-        role=BusinessRole.STUDENT,
-        internal_id=42,
-    )
-    assert user.internal_id == 42
-
-
-@pytest.mark.parametrize("bad", [0, -1])
-def test_user_create_rejects_non_positive_internal_id(bad: int):
+def test_login_request_requires_fields():
     with pytest.raises(ValidationError):
-        UserCreate(
-            email="a@b.c",
-            password="password",
-            role=BusinessRole.STUDENT,
-            internal_id=bad,
-        )
+        LoginRequest()
 
 
-def test_user_create_internal_id_defaults_to_none():
-    user = UserCreate(email="a@b.c", password="password", role=BusinessRole.ADMIN)
-    assert user.internal_id is None
+def test_token_response_defaults_to_bearer():
+    token = TokenResponse(access_token="abc")
+    assert token.token_type == "bearer"
 
 
-def test_user_out_optional_fields():
-    u = UserOut(id=1, external_id="ext", role="student", is_active=True)
-    assert u.email is None
-    assert u.internal_id is None
+def test_me_optional_links_and_role_default_to_none():
+    me = Me(id=1, email="a@b.c")
+    assert me.student_id is None
+    assert me.staff_id is None
+    assert me.role is None
+    assert me.is_active is True
+
+
+def test_me_with_links_and_role():
+    me = Me(id=2, email="a@b.c", student_id=7, staff_id=None, role="student")
+    assert me.student_id == 7
+    assert me.role == "student"

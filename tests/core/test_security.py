@@ -18,11 +18,11 @@ def test_password_hash_roundtrip():
 
 
 def test_create_and_decode_token(rsa_keys):
-    token = create_access_token(subject="42", role="admin", email="a@b.c")
+    token = create_access_token(subject="42")
     payload = decode_access_token(token)
     assert payload["sub"] == "42"
-    assert payload["role"] == "admin"
-    assert payload["email"] == "a@b.c"
+    # Роль не кладётся в токен: она резолвится на каждый запрос через db.
+    assert "role" not in payload
 
 
 def test_decode_raises_on_bad_token(rsa_keys):
@@ -44,7 +44,7 @@ def test_decode_rejects_token_signed_with_other_key(tmp_path, monkeypatch):
             jwt_public_key_path=str(cert_path),
         ),
     )
-    token = create_access_token(subject="42", role="admin")
+    token = create_access_token(subject="42")
 
     other_cert, _ = gen_keypair(tmp_path / "other")
     monkeypatch.setattr(
@@ -74,4 +74,4 @@ def test_create_token_raises_when_key_missing(tmp_path, monkeypatch):
         ),
     )
     with pytest.raises(RuntimeError, match="make certs"):
-        create_access_token(subject="42", role="admin")
+        create_access_token(subject="42")
