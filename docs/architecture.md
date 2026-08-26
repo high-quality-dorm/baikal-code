@@ -160,7 +160,7 @@ App использует из `db` только: `get_user_by_login`, `get_user`
 
 ### frontend (каталог `frontend/`)
 React (Vite) SPA — веб-интерфейс по [design.md](design.md). Страницы: лендинг
-(`/`), чат (`/chat`), вход (`/login`).
+(`/`), чат (`/chat`), вход (`/login`), виджет (`/widget`).
 - **Стек:** React 18, react-router-dom, Vite. Никакого UI-фреймворка — свои
   токены/компоненты на CSS-переменных (светлая и тёмная темы).
 - **Dev-прокси:** `vite.config.js` проксирует `/api` на FastAPI (`:8000`),
@@ -177,6 +177,15 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 - **Гостевой доступ:** неавторизованный пользователь работает в отдельной
   гостевой сессии без привязки к бизнес-ролям; роль в интерфейсе не
   показывается (бейдж «Гость»).
+- **Встраиваемый виджет** (`src/pages/Widget.jsx`, страница `/widget`,
+  см. ADR 42): плавающий launcher-чат для встраивания во внешние сайты
+  университета через `<iframe src="https://baikal.example/widget">`.
+  Работает как гость + кнопка «Войти» (вход в новой вкладке, сессия
+  подхватывается через `storage`-событие — `auth.jsx`). API-базис
+  вычисляется из собственного origin (`window.location.origin + /api/v1`),
+  поэтому в iframe запросы идут на наш домен, а не на внешний хост. Стили —
+  `styles/widget.css` на токенах; переиспользуются `Markdown`,
+  `SqlDisclosure`, `RoleBadge`, mock-фолбэк.
 
 ## Продакшен-инфраструктура (deploy/)
 
@@ -192,7 +201,10 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 - **Nginx:** `deploy/nginx.conf` — 80 (redirect → HTTPS) и 443; SPA-fallback на
   `index.html`; `location /api/` проксирует на `backend:8000` с
   `X-Forwarded-For` (нужен для rate limiting гостей по IP, ADR 37) и
-  отключённой буферизацией (NDJSON-поток `/ask`).
+  отключённой буферизацией (NDJSON-поток `/ask`). Вместо
+  `X-Frame-Options: SAMEORIGIN` (запрещал встраивание на внешние домены)
+  отдаётся `Content-Security-Policy: frame-ancestors *` — виджет `/widget`
+  встраивается во внешние сайты университета через iframe (см. ADR 42).
 
 ## Модель безопасности (3 уровня)
 
