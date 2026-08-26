@@ -191,13 +191,14 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 
 - **Стек:** два контейнера docker-compose в `deploy/` — `backend` (FastAPI,
   образ из `deploy/Dockerfile`) и `nginx` (статика SPA + прокси `/api`).
-  База данных внешняя, в стек не входит; схема/роли/RLS применяются один раз
-  через `app_owner` (см. [README.md](README.md)).
+  База данных внешняя, в стек не входит; схема/роли/RLS/вью применяются один раз
+  через `app_owner` (`make -C deploy db-init`, см. [README.md](README.md)).
 - **Один worker** uvicorn: rate limiting in-process (ADR 37) — при нескольких
   процессах лимит был бы per-process.
-- **Секреты** (пароли БД, LLM-ключ) передаются через `env_file`
-  (`deploy/.env.prod`), не зашиты в образ; JWT-ключи (`certs/`) и TLS-сертификаты
-  монтируются volume'ами.
+- **Секреты** (пароли БД, LLM-ключ) — единый `deploy/.env`: читается compose для
+  подстановки `${...}` и передаётся в контейнер через `env_file`. Не зашиты в
+  образ; JWT-ключи (`certs/`) и TLS-сертификаты (`CERT_DIR`) монтируются
+  volume'ами. Оркестрация — `deploy/Makefile` (см. ADR 43).
 - **Nginx:** `deploy/nginx.conf` — 80 (redirect → HTTPS) и 443; SPA-fallback на
   `index.html`; `location /api/` проксирует на `backend:8000` с
   `X-Forwarded-For` (нужен для rate limiting гостей по IP, ADR 37) и

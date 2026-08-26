@@ -2,13 +2,18 @@
 # здесь её нет — только приложение и веб-сервер.
 #
 # Использование (из каталога deploy/):
-#   cp .env.prod.example .env.prod   # заполнить секреты
-#   docker compose up -d --build
+#   make setup       # .env из шаблона + JWT-ключи + сборка фронтенда
+#   nano .env        # заполнить секреты (DSN внешней БД, LLM, CERT_DIR)
+#   make up          # docker compose up -d --build
 #
-# Перед этим (один раз):
-#   - применить схему/роли/RLS к внешней БД (db/*.sql) через app_owner;
-#   - собрать фронтенд: npm ci && npm run build (в ../frontend);
-#   - положить сертификаты по путям из CERT_* переменных ниже.
+# Единый файл деплоя — deploy/.env: читается compose для подстановки ${...}
+# (CERT_DIR) и передаётся в контейнер backend через env_file.
+#
+# Перед запуском (один раз):
+#   - применить схему/роли/RLS к внешней БД (db/*.sql) через app_owner
+#     (make db-init, если есть DATABASE_URL_OWNER в .env);
+#   - собрать фронтенд: make frontend (в ../frontend/dist);
+#   - положить TLS-сертификаты fullchain.pem/privkey.pem в каталог CERT_DIR.
 
 services:
   backend:
@@ -18,12 +23,17 @@ services:
     container_name: baikal-backend
     restart: unless-stopped
     env_file:
-      - .env.prod
+      - .env
     # JWT-ключи (RS256) монтируются, а не зашиваются в образ.
     volumes:
       - ../certs:/app/certs:ro
     networks:
       - deploy-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nginx:
     image: nginx:stable-alpine
@@ -37,10 +47,16 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       # Собранный фронтенд (frontend/dist) и сертификаты монтируются с хоста.
+      # CERT_DIR обязателен: при отсутствии compose упадёт с понятной ошибкой.
       - ../frontend/dist:/usr/share/nginx/html:ro
-      - ${CERT_DIR}:/etc/nginx/certs:ro
+      - ${CERT_DIR:?CERT_DIR must be set in deploy/.env}:/etc/nginx/certs:ro
     networks:
       - deploy-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   deploy-net:

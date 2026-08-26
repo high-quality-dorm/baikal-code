@@ -12,6 +12,7 @@ venv/
 # environment variables
 .env
 .env.dev
+.env.prod
 !.env.example
 
 # generated JWT signing keys

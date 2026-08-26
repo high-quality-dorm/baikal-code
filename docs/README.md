@@ -93,38 +93,61 @@ npm run build    # production-сборка в frontend/dist
 по ссылке к отдельному серверу), в стеке её нет. Статика фронтенда раздаётся
 nginx'ом, а `/api` проксируется на бэкенд.
 
-Подготовка (один раз):
+### Окружения: два `.env`
 
-1. Применить схему, роли, RLS и публичные вью к внешней БД через роль
-   `app_owner`:
-   ```bash
-   psql "$DATABASE_URL_OWNER" -f db/01_schema.sql
-   psql "$DATABASE_URL_OWNER" -f db/02_roles.sql
-   psql "$DATABASE_URL_OWNER" -f db/03_rls.sql
-   psql "$DATABASE_URL_OWNER" -f db/04_views.sql
-   ```
-   Учётные записи заводятся вне приложения (сид / вручную).
-2. Собрать фронтенд:
-   ```bash
-   cd frontend && npm ci && npm run build && cd ..
-   ```
-3. Сгенерировать JWT-ключи, если ещё нет: `make certs` (в `certs/`).
-4. Положить сертификаты `fullchain.pem`/`privkey.pem` в директорию, указанную в
-   `CERT_DIR`.
+Проект использует **два окружения, по одному `.env` на каждое**:
 
-Запуск (из каталога `deploy/`):
+| Окружение | Файл конфига | Шаблон | Команды |
+| --------- | ------------ | ------ | ------- |
+| Разработка | `/.env` | `/.env.example` | корневой `Makefile` |
+| Продакшен | `deploy/.env` | `deploy/.env.example` | `deploy/Makefile` |
+
+В проде `deploy/.env` — **единый файл деплоя**: он читается docker compose для
+подстановки `${...}` (переменная `CERT_DIR`) и одновременно передаётся в контейнер
+`backend` через `env_file: .env`. Dev-окружение (root `.env`) от проде не зависит.
+
+### Запуск (на сервере)
 
 ```bash
-cp .env.prod.example .env.prod   # заполнить секреты (DSN внешней БД, LLM, JWT)
-docker compose up -d --build
+cd deploy
+make setup     # один раз: .env из шаблона + JWT-ключи + сборка фронтенда
+nano .env      # заполнить секреты (DSN внешней БД, LLM, CERT_DIR)
+make up        # docker compose up -d --build
+make logs      # наблюдать
 ```
+
+Обновление: `git pull && make up` (если менялся фронтенд — сначала `make frontend`).
+
+Примечание: если раньше использовался `deploy/.env.prod`, перенесите его значения
+в новый `deploy/.env` и удалите старый файл (имя `.env.prod` теперь игнорируется
+git'ом).
+
+### Одноразовая настройка внешней БД
+
+Схему, роли, RLS и вью применяют один раз через роль `app_owner` (учётные записи
+заводятся вне приложения — сид / вручную). С сервера это делает
+`make -C deploy db-init` (нужен `DATABASE_URL_OWNER` в `deploy/.env`), либо
+вручную:
+
+```bash
+psql "$DATABASE_URL_OWNER" -f db/01_schema.sql
+psql "$DATABASE_URL_OWNER" -f db/02_roles.sql
+psql "$DATABASE_URL_OWNER" -f db/03_rls.sql
+psql "$DATABASE_URL_OWNER" -f db/04_views.sql
+```
+
+### Особенности
 
 - Бэкенд — **один worker** uvicorn: rate limiting in-process (ADR 37), при
   нескольких процессах лимит считался бы per-process.
-- Секреты передаются через `env_file` (не зашиты в образ); JWT-ключи и
-  сертификаты монтируются volume'ами.
+- Секреты передаются через `env_file: .env` (не зашиты в образ); JWT-ключи
+  (генерируются `make setup` в `certs/`) и TLS-сертификаты (каталог `CERT_DIR`)
+  монтируются volume'ами.
 - Nginx слушает 80 (redirect → HTTPS) и 443, раздаёт `frontend/dist` и
-  проксирует `/api` на бэкенд.
+  проксирует `/api` на бэкенд; `CERT_DIR` обязателен — при его отсутствии
+  compose упадёт с понятной ошибкой.
+- Подробные команды — в `deploy/Makefile` (`up`, `down`, `restart`, `ps`,
+  `logs`, `config`, `db-init`).
 
 ## Команды
 
