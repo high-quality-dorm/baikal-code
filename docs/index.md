@@ -45,6 +45,7 @@
 | Контейнер сервисов и шов DI (`AppContext`, `get_context`) | `packages/app/src/app/context.py` |
 | Схема БД (22 таблицы)                                  | `db/01_schema.sql`                           |
 | Роли и права (app_ro/app_service), set-based RLS       | `db/02_roles.sql`, `db/03_rls.sql`          |
+| Публичные агрегатные вью по студентам (численность без PII, видны всем) | `db/04_views.sql` |
 | Генератор синтетики                                   | `scripts/seed.py`                            |
 | Веб-интерфейс (React SPA: лендинг/чат/вход, токены, mock-ассистент) | `frontend/`                       |
 | Docker-контейнер БД (postgres:16-alpine)              | `docker-compose.yml`                         |

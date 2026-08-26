@@ -54,9 +54,10 @@ PostgreSQL (roles + set-based RLS)
   `app_service`); `connection_for(pools, identity)` ставит RLS-контекст
   (`set_config('app.student_id'/'app.staff_id', ..., true)`) в начале транзакции;
   создание пула сериализуется локом (гонка исключена); в транзакции ставится
-  `statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT. Для
-  гостя (identity None) ни один GUC не ставится → RLS deny-by-default на
-  `students`/`marks`, общие таблицы открыты.
+`statement_timeout` (10 с по умолчанию) — защита от «зависших» SELECT. Для
+   гостя (identity None) ни один GUC не ставится → RLS deny-by-default на
+   `students`/`marks`, общие таблицы открыты; публичные агрегаты по студентам
+   доступны всем через вью `v_*` (`db/04_views.sql`, см. ADR 41).
 - `identity.py` — резолюция identity: `users.id` → `Identity(student_id,
   staff_id, is_active)` через служебный пул `app_service`; `resolve_role` —
   для app-уровня (известная должность из `staff.position` приоритетнее
@@ -71,6 +72,7 @@ PostgreSQL (roles + set-based RLS)
 - `schema.py` — маскированное описание схемы для LLM из живого каталога БД +
   русские описания таблиц; гость не видит `students`/`marks`, любой
   аутентифицированный — все доменные таблицы (скоуп строк задаёт RLS);
+  публичные агрегатные вью `v_*` видны всем (включая гостя);
   PK/FK для генерации JOIN — из статического `TABLE_META`; PII-колонки
   помечаются метаданными `SENSITIVE_COLUMNS`;
 - `audit.py` — запись запросов в `query_log` через роль `app_service`;
@@ -219,6 +221,17 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
    - зав. кафедрой — студентов групп по предметам своей кафедры и оценки по ним;
    - декан — студентов своего факультета и их оценки;
    - администрация видит всё.
+   - **Исключение для публичной статистики:** с `students` снят `FORCE` RLS
+     (`ENABLE` и все политики остаются). Владелец таблиц (`app_owner`) — и
+     только он — обходит RLS и считает публичные агрегаты через вью `v_*`
+     (`db/04_views.sql`). Для `app_ro` (не владельца) RLS применяется всегда;
+     вью отдают только фиксированные счётчики без PII. `marks` остаётся с
+     `FORCE` (см. ADR 41).
+
+3. **Публичные агрегатные вью** (`db/04_views.sql`), контролируемая «дверь» для
+   не-PII данных: численность студентов (всего, по факультетам/направлениям/
+   группам/статусам/годам, отчисления) видна всем пользователям, включая
+   гостя, напрямую из `students`/`marks` данных не даёт.
 
 ## Модель доступа (identity)
 
@@ -233,7 +246,8 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 - **Гость:** запрос без `user_id` (или у пользователя нет ни `student_id`, ни
   `staff_id`) — RLS deny-by-default на `students`/`marks`, открыты только общие
   таблицы (факультеты, направления, аудитории, расписание, приёмная кампания и
-  т.п.). Это соответствует сценарию «абитуриент/гость».
+  т.п.) и публичные агрегатные вью `v_*` (численность студентов, без PII).
+  Это соответствует сценарию «абитуриент/гость».
 - Роли бизнес-уровня и PII-политика описаны в [roles.md](roles.md).
 - Пользователь с обоими id получает **объединение** скоупов студента и
   сотрудника.
@@ -245,6 +259,10 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 `classrooms`, `lessons`, `lesson_group`, `marks`, `users`, `admission_campaigns`,
 `admission_committees`, `admission_committee_members`, `admission_plans`,
 `admission_stats`, `query_log`. Полное определение — в `db/01_schema.sql`.
+Плюс 7 публичных агрегатных вью (`db/04_views.sql`): `v_students_total`,
+`v_students_by_faculty`, `v_students_by_specialization`, `v_students_by_group`,
+`v_students_by_status`, `v_students_by_admission_year`, `v_students_expelled` —
+численность студентов без персональных данных, доступна всем.
 Ключевые особенности:
 - `users` не хранит роль — она выводится динамически (`student_id` → студент,
   `staff_id` → роль из `staff.position`);
