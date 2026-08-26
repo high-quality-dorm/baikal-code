@@ -174,6 +174,22 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
   гостевой сессии без привязки к бизнес-ролям; роль в интерфейсе не
   показывается (бейдж «Гость»).
 
+## Продакшен-инфраструктура (deploy/)
+
+- **Стек:** два контейнера docker-compose в `deploy/` — `backend` (FastAPI,
+  образ из `deploy/Dockerfile`) и `nginx` (статика SPA + прокси `/api`).
+  База данных внешняя, в стек не входит; схема/роли/RLS применяются один раз
+  через `app_owner` (см. [README.md](README.md)).
+- **Один worker** uvicorn: rate limiting in-process (ADR 37) — при нескольких
+  процессах лимит был бы per-process.
+- **Секреты** (пароли БД, LLM-ключ) передаются через `env_file`
+  (`deploy/.env.prod`), не зашиты в образ; JWT-ключи (`certs/`) и TLS-сертификаты
+  монтируются volume'ами.
+- **Nginx:** `deploy/nginx.conf` — 80 (redirect → HTTPS) и 443; SPA-fallback на
+  `index.html`; `location /api/` проксирует на `backend:8000` с
+  `X-Forwarded-For` (нужен для rate limiting гостей по IP, ADR 37) и
+  отключённой буферизацией (NDJSON-поток `/ask`).
+
 ## Модель безопасности (3 уровня)
 
 Безопасность строится тремя независимыми слоями, которые усиливают друг друга:

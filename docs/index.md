@@ -8,6 +8,7 @@
 | Тема / вопрос                                              | Куда смотреть                       |
 | ---------------------------------------------------------- | ----------------------------------- |
 | Что это за проект, как запустить                          | [README.md](README.md)            |
+| Как развернуть в проде (Docker + nginx, внешняя БД)      | [README.md](README.md) (раздел «Развёртывание в проде»), [decisions.md](decisions.md) (ADR 40) |
 | Требования: кто что может видеть, PII-политика            | [roles.md](roles.md)                |
 | Как устроена система, поток запроса, модель безопасности  | [architecture.md](architecture.md)  |
 | Дизайн веб-интерфейса: токены, страницы, гостевой доступ  | [design.md](design.md)              |
@@ -47,6 +48,7 @@
 | Генератор синтетики                                   | `scripts/seed.py`                            |
 | Веб-интерфейс (React SPA: лендинг/чат/вход, токены, mock-ассистент) | `frontend/`                       |
 | Docker-контейнер БД (postgres:16-alpine)              | `docker-compose.yml`                         |
+| Прод-стек (Dockerfile бэкенда, nginx, docker-compose, шаблон секретов) | `deploy/`                     |
 | Команды (sync/run/db/seed/format/check/test)          | `Makefile`                                   |
 
 ## Соглашения проекта
