@@ -135,6 +135,23 @@ def test_ask_empty_question_is_422():
     assert resp.status_code == 422
 
 
+def test_ask_text_with_history_context_accepted():
+    """Текст с вклеенной историей (>2000 символов) проходит лимит."""
+    client, fake = _make_client(_gateway_with_user())
+    history = "Пользователь: Вопрос\nАссистент: Ответ\n" * 100
+    resp = client.post("/api/v1/ask", json={"text": history + "Сколько студентов?"})
+
+    assert resp.status_code == 200
+    assert len(fake.calls) == 1
+    assert fake.calls[0][0].startswith("Пользователь:")
+
+
+def test_ask_oversized_text_is_422():
+    client, _ = _make_client(_gateway_with_user())
+    resp = client.post("/api/v1/ask", json={"text": "а" * 100_001})
+    assert resp.status_code == 422
+
+
 def test_ask_guest_rate_limited(monkeypatch):
     """Гость исчерпывает лимит → 429, агент не вызывается."""
     from app.api import ask as ask_mod

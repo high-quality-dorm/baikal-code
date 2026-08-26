@@ -19,6 +19,18 @@ import {
 
 const MAX_LEN = 2000;
 
+/** Собирает текст запроса: предыдущие реплики беседы + новый вопрос. */
+function buildContext(messages, question) {
+  const lines = [];
+  for (const msg of messages) {
+    if (!msg.text) continue;
+    const label = msg.role === "user" ? "Пользователь" : "Ассистент";
+    lines.push(`${label}: ${msg.text}`);
+  }
+  if (lines.length === 0) return question;
+  return `Ранее в беседе:\n${lines.join("\n")}\nНовый вопрос: ${question}`;
+}
+
 function TypingDots() {
   return (
     <span className="typing" aria-label="Ассистент печатает ответ">
@@ -109,6 +121,8 @@ export default function Chat() {
     if (!question || pendingRef.current) return;
     setInput("");
     const assistantId = crypto.randomUUID();
+    // Контекст беседы уходит в текст запроса, чтобы LLM знала о предыдущих репликах.
+    const payload = buildContext(messages, question);
     setMessages((m) => [
       ...m,
       { id: crypto.randomUUID(), role: "user", text: question },
@@ -145,7 +159,7 @@ export default function Chat() {
     };
 
     try {
-      await askStream(question, {
+      await askStream(payload, {
         token: session?.accessToken,
         signal: controller.signal,
         onStatus: (message) => {
@@ -189,7 +203,7 @@ export default function Chat() {
         finish(answerText, answerMeta, null);
       } else if (err instanceof EndpointMissingError) {
         // /ask недоступен (бэкенд не запущен) — отвечаем локальным mock.
-        const answer = mockAnswer(question);
+        const answer = mockAnswer(payload);
         finish(answer.text, answer.meta, null);
       } else if (err instanceof ApiError) {
         finish("", null, err.message);
