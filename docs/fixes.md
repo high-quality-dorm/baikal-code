@@ -76,7 +76,13 @@
 
 ---
 
-## Этап 2 — Разрешить PII тем, кому RLS открывает строку
+## Этап 2 — Разрешить PII тем, кому RLS открывает строку ✅ выполнено
+
+> Реализовано: `AuthContext.can_see_pii = resolve_identity(user_id) is not None`
+> (`auth/deps.py`), проброс через `Agent.stream(..., can_see_pii)` в
+> `build_system_prompt(schema_text, role, can_see_pii)` (`agent/prompts.py`).
+> Тесты в `tests/services/test_prompts.py`, `tests/auth/test_deps.py`,
+> `tests/api/test_ask.py`, `tests/services/test_agent.py`. ADR 38.
 
 **Признак PII-доступа** — `can_see_pii = (resolve_identity(user_id) is not None)`,
 то есть «есть RLS-скоуп», а **не** роль строкой. RLS сам ограничивает, какие

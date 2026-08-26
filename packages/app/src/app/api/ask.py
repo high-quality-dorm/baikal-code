@@ -33,7 +33,9 @@ async def ask(
 
     async def gen():
         try:
-            async for event in ctx.agent.stream(question.text, user.user_id, user.role):
+            async for event in ctx.agent.stream(
+                question.text, user.user_id, user.role, user.can_see_pii
+            ):
                 yield json.dumps(event, ensure_ascii=False) + "\n"
         except Exception as exc:  # noqa: BLE001
             yield (

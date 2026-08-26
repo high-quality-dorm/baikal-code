@@ -106,9 +106,17 @@ class Agent:
         self._max_steps = max_steps
 
     async def stream(
-        self, question: str, user_id: int | None, role: str | None
+        self,
+        question: str,
+        user_id: int | None,
+        role: str | None,
+        can_see_pii: bool,
     ) -> AsyncIterator[dict[str, object]]:
-        """Эмитит NDJSON-события: status/query/token/done/error."""
+        """Эмитит NDJSON-события: status/query/token/done/error.
+
+        can_see_pii — доступ к персональным данным студентов (есть RLS-скоуп);
+        влияет на системный промпт, технический скоуп ограничивает RLS.
+        """
         yield {"type": "status", "stage": "started", "message": "Формирую ответ…"}
         try:
             schema = await self._gateway.get_schema(user_id)
@@ -118,7 +126,9 @@ class Agent:
         yield {"type": "status", "stage": "schema", "message": "Загружаю схему…"}
 
         messages: list[BaseMessage] = [
-            SystemMessage(content=build_system_prompt(schema_to_text(schema), role)),
+            SystemMessage(
+                content=build_system_prompt(schema_to_text(schema), role, can_see_pii)
+            ),
             HumanMessage(content=question),
         ]
         executor = ToolExecutor(self._gateway, user_id)

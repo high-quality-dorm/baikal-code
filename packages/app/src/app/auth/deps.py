@@ -23,10 +23,16 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 @dataclass
 class AuthContext:
-    """Идентичность текущего пользователя из JWT (роль резолвится свежей)."""
+    """Идентичность текущего пользователя из JWT (роль резолвится свежей).
+
+    `can_see_pii` — доступ к персональным данным студентов: True, если у
+    пользователя есть RLS-скоуп (resolve_identity не None). Не роль строкой:
+    скоуп ограничивает сам RLS.
+    """
 
     user_id: int | None = None
     role: str | None = None
+    can_see_pii: bool = False
 
 
 def _decode_user_id(credentials: HTTPAuthorizationCredentials) -> int | None:
@@ -49,7 +55,11 @@ async def _resolve_auth(ctx: Context, user_id: int) -> AuthContext:
             status_code=401, detail="Учётная запись не найдена или деактивирована"
         )
     role = await ctx.gateway.resolve_role(user_id)
-    return AuthContext(user_id=user_id, role=role)
+    return AuthContext(
+        user_id=user_id,
+        role=role,
+        can_see_pii=identity is not None,
+    )
 
 
 async def get_current_user(

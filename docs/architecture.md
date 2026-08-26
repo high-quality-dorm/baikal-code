@@ -118,16 +118,21 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
 - `auth/deps.py` — `get_current_user` (обязательная auth: нет/невалидный токен
   или неактивная учётка → 401), `get_optional_context` (гость при
   отсутствии/невалидном токене; валидный токен неактивной учётки → 401).
-  Идентичность и роль резолвятся через `db.resolve_identity`/`resolve_role`.
+  Идентичность и роль резолвятся через `db.resolve_identity`/`resolve_role`;
+  `AuthContext` несёт `can_see_pii = resolve_identity(user_id) is not None`
+  (есть RLS-скоуп, см. ADR 38).
 - `auth/router.py` — `/login`, `/users/me`.
 - `services/auth.py` — `AuthService(gateway)`: `authenticate` (bcrypt с
   dummy-hash против timing-оракла, email нормализуется), `get_me`.
 - `agent/` — тул-агент (см. ADR 36):
-  - `prompts.py` — системный промпт (read-only SELECT, LIMIT, PII, самокоррекция)
-    + `build_system_prompt(schema_text, role)`;
+  - `prompts.py` — системный промпт (read-only SELECT, LIMIT, самокоррекция)
+    + `build_system_prompt(schema_text, role, can_see_pii)`: правило PII
+    выбирается по `can_see_pii` — разрешено в рамках RLS-скоупа или запрет
+    «только агрегаты» для гостя (см. ADR 38);
   - `tools.py` — `EXECUTE_QUERY_SCHEMA` и `ToolExecutor(gateway, user_id)`
     (`ToolResult(content, meta)`; `GatewayError` → текст ошибки);
-  - `agent.py` — `Agent.stream(question, user_id, role)` — цикл LLM-вызовов
+  - `agent.py` — `Agent.stream(question, user_id, role, can_see_pii)` — цикл
+    LLM-вызовов
     (≤ `agent_max_steps`) со стримингом: токены финального текста идут сразу,
     `tool_call_chunks` собираются и исполняются после шага; события
     `status/query/token/done/error`; `AgentError`.
@@ -135,7 +140,8 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
   `bind_tools`, `LLMError`), `render.py` (`schema_to_text`).
 - `api/ask.py` — `POST /ask` через `get_optional_context`; отдаёт
   `StreamingResponse` (NDJSON), формат событий — см. ADR 36; перед агентом —
-  проверка rate limit (см. ADR 37);
+  проверка rate limit (см. ADR 37); в агент прокидывается `can_see_pii`
+  пользователя (см. ADR 38);
 - `core/` — `config.py` (JWT + LLM + `agent_max_steps` + параметры rate limit),
   `security.py` (bcrypt + JWT RS256), `ratelimit.py` (`SlidingWindowLimiter` —
   скользящее окно по ключу, in-process).

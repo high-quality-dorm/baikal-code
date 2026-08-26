@@ -15,7 +15,7 @@ from db.models import (
     SchemaDescription,
     TableInfo,
 )
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.messages.ai import AIMessageChunk
 
 from app.agent.agent import Agent
@@ -80,6 +80,7 @@ class ScriptedLLM:
     def __init__(self, *responses: AIMessageChunk | list[AIMessageChunk]) -> None:
         self._responses = [r if isinstance(r, list) else [r] for r in responses]
         self.calls = 0
+        self.seen_system: list[str] = []
 
     async def stream(
         self,
@@ -87,6 +88,11 @@ class ScriptedLLM:
         tools: list[dict[str, object]] | None = None,
     ) -> AsyncIterator[AIMessageChunk]:
         self.calls += 1
+        system = next(
+            (m.content for m in messages if isinstance(m, SystemMessage)), ""
+        )
+        if isinstance(system, str):
+            self.seen_system.append(system)
         index = min(self.calls - 1, len(self._responses) - 1)
         for chunk in self._responses[index]:
             yield chunk
@@ -127,9 +133,15 @@ def _gateway() -> FakeGateway:
 
 
 async def _events(
-    agent: Agent, question: str = "Сколько факультетов?", user_id=1, role="student"
+    agent: Agent,
+    question: str = "Сколько факультетов?",
+    user_id=1,
+    role="student",
+    can_see_pii=True,
 ) -> list[dict[str, object]]:
-    return [event async for event in agent.stream(question, user_id, role)]
+    return [
+        event async for event in agent.stream(question, user_id, role, can_see_pii)
+    ]
 
 
 def _types(events: list[dict[str, object]]) -> list[str]:
@@ -201,10 +213,40 @@ async def test_guest_uses_none_user_id():
     )
     agent = Agent(gw, llm, max_steps=5)
 
-    events = await _events(agent, user_id=None, role=None)
+    events = await _events(agent, user_id=None, role=None, can_see_pii=False)
 
     assert _types(events)[-1] == "done"
     assert gw.execute_calls == [("SELECT COUNT(*) FROM faculties;", None)]
+
+
+@pytest.mark.anyio
+async def test_can_see_pii_true_allows_pii_in_prompt():
+    gw = _gateway()
+    llm = ScriptedLLM(
+        _tool_chunks(sql="SELECT COUNT(*) FROM faculties;"),
+        _text_chunk("5"),
+    )
+    agent = Agent(gw, llm, max_steps=5)
+
+    await _events(agent, can_see_pii=True)
+
+    assert "можно выбирать" in llm.seen_system[0]
+    assert "только обобщения и агрегаты" not in llm.seen_system[0]
+
+
+@pytest.mark.anyio
+async def test_can_see_pii_false_blocks_pii_in_prompt():
+    gw = _gateway()
+    llm = ScriptedLLM(
+        _tool_chunks(sql="SELECT COUNT(*) FROM faculties;"),
+        _text_chunk("5"),
+    )
+    agent = Agent(gw, llm, max_steps=5)
+
+    await _events(agent, can_see_pii=False)
+
+    assert "только обобщения и агрегаты" in llm.seen_system[0]
+    assert "можно выбирать" not in llm.seen_system[0]
 
 
 @pytest.mark.anyio

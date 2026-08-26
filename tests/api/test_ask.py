@@ -24,12 +24,16 @@ class FakeAgent:
 
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
-        self.calls: list[tuple[str, int | None, str | None]] = []
+        self.calls: list[tuple[str, int | None, str | None, bool]] = []
 
     async def stream(
-        self, question: str, user_id: int | None, role: str | None
+        self,
+        question: str,
+        user_id: int | None,
+        role: str | None,
+        can_see_pii: bool,
     ) -> AsyncIterator[dict[str, object]]:
-        self.calls.append((question, user_id, role))
+        self.calls.append((question, user_id, role, can_see_pii))
         if self.error is not None:
             yield {"type": "error", "message": str(self.error)}
             return
@@ -82,7 +86,7 @@ def test_ask_as_guest():
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/x-ndjson")
     assert [e["type"] for e in _events(resp)] == ["status", "token", "done"]
-    assert fake.calls == [("Сколько студентов?", None, None)]
+    assert fake.calls == [("Сколько студентов?", None, None, False)]
 
 
 def test_ask_as_authed_user():
@@ -100,7 +104,7 @@ def test_ask_as_authed_user():
     assert resp.status_code == 200
     events = _events(resp)
     assert events[-1]["type"] == "done"
-    assert fake.calls == [("Сколько студентов?", 1, "student")]
+    assert fake.calls == [("Сколько студентов?", 1, "student", True)]
 
 
 def test_ask_bad_token_is_guest():
@@ -112,7 +116,7 @@ def test_ask_bad_token_is_guest():
     )
 
     assert resp.status_code == 200
-    assert fake.calls == [("Сколько студентов?", None, None)]
+    assert fake.calls == [("Сколько студентов?", None, None, False)]
 
 
 def test_ask_error_event():
