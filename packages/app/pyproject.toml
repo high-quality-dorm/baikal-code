@@ -1,7 +1,7 @@
 [project]
 name = "app"
 version = "0.1.0"
-description = "FastAPI приложение: text-to-SQL поверх db_mcp"
+description = "FastAPI приложение: text-to-SQL поверх db"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

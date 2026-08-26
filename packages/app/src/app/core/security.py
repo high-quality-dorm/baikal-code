@@ -71,17 +71,17 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(subject: str, role: str, email: str | None = None) -> str:
-    """Создаёт JWT access-токен (RS256), подписанный закрытым ключом."""
+def create_access_token(subject: str) -> str:
+    """Создаёт JWT access-токен (RS256), подписанный закрытым ключом.
+
+    Роль в токен не кладётся: она резолвится на каждый запрос через пакет db.
+    """
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
-        "role": role,
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_expires_minutes),
     }
-    if email is not None:
-        payload["email"] = email
     key = _private_key(settings.jwt_private_key_path)
     return jwt.encode(payload, key, algorithm=settings.jwt_algorithm)
 

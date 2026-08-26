@@ -25,7 +25,9 @@ class LLMError(Exception):
 class LLMClient(Protocol):
     """Интерфейс LLM, которым пользуется конвейер (для фейков в тестах)."""
 
-    async def generate_sql(self, question: str, schema: str, role: str) -> str: ...
+    async def generate_sql(
+        self, question: str, schema: str, role: str | None
+    ) -> str: ...
 
     async def answer(
         self,
@@ -80,14 +82,15 @@ class ChatLLM:
             temperature=s.llm_temperature,
         )
 
-    async def generate_sql(self, question: str, schema: str, role: str) -> str:
+    async def generate_sql(self, question: str, schema: str, role: str | None) -> str:
         """Возвращает SQL по вопросу и схеме (роль не участвует в промпте)."""
         llm = self._client()
         messages = [
             SystemMessage(content=SQL_SYSTEM_PROMPT),
             HumanMessage(
                 content=(
-                    f"Схема базы данных (роль {role}):\n{schema}\n\n"
+                    f"Схема базы данных (роль {role or 'гость'}):\n"
+                    f"{schema}\n\n"
                     f"Вопрос пользователя: {question}"
                 )
             ),

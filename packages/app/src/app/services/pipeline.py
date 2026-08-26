@@ -1,8 +1,8 @@
-"""Конвейер text-to-SQL: вопрос -> SQL -> исполнение через шлюз -> ответ по-русски.
+"""Конвейер text-to-SQL: вопрос -> SQL -> исполнение через пакет db -> ответ.
 
-Поток: схема под роль (get_schema) -> генерация SQL через LLM -> исполнение
-через шлюз db_mcp с RLS-контекстом (user_id = номер учётки) -> пересказ
-результата по-русски вторым LLM-вызовом -> Answer с метаданными запроса.
+Поток: схема под пользователя (`get_schema`) -> генерация SQL через LLM ->
+исполнение через `db.Gateway` с RLS-контекстом (user_id = номер учётки, гость
+= None) -> пересказ результата по-русски вторым LLM-вызовом -> `Answer`.
 
 Ошибки шлюза (GatewayError) и LLM (LLMError) пробрасываются наверх без ретрая
 LLM: сгенерированный SQL не переспрашивается, ответ — понятная HTTP-ошибка.
@@ -10,37 +10,33 @@ LLM: сгенерированный SQL не переспрашивается, �
 
 from __future__ import annotations
 
+from db.gateway import Gateway
+
 from app.api.schemas import Answer, QueryMeta
-from app.gateway import GatewayClient
 from app.llm import LLMClient
+from app.llm.render import schema_to_text
 
 
 class Pipeline:
-    """Собирает ответ пользователю из LLM и шлюза db_mcp."""
+    """Собирает ответ пользователю из LLM и шлюза db."""
 
-    def __init__(self, gateway: GatewayClient, llm: LLMClient) -> None:
+    def __init__(self, gateway: Gateway, llm: LLMClient) -> None:
         self._gateway = gateway
         self._llm = llm
 
-    async def close(self) -> None:
-        """Закрывает MCP-сессию шлюза (идемпотентно)."""
-        await self._gateway.close()
-
-    async def ask(self, question: str, role: str, user_id: str) -> Answer:
-        """Отвечает на вопрос пользователя (role + users.id из JWT)."""
-        schema = await self._gateway.get_schema(role)
-        sql = await self._llm.generate_sql(question, schema, role)
-        result = await self._gateway.execute_query(sql, role, user_id)
-        columns: list[str] = result["columns"]
-        rows: list[list[object]] = result["rows"]
-        text = await self._llm.answer(question, sql, columns, rows)
+    async def ask(self, question: str, user_id: int | None, role: str | None) -> Answer:
+        """Отвечает на вопрос пользователя (user_id=None — гость)."""
+        schema = await self._gateway.get_schema(user_id)
+        sql = await self._llm.generate_sql(question, schema_to_text(schema), role)
+        result = await self._gateway.execute_query(sql, user_id)
+        text = await self._llm.answer(question, sql, result.columns, result.rows)
         return Answer(
             text=text,
             meta=QueryMeta(
                 sql=sql,
-                row_count=result.get("row_count", 0),
-                truncated=result.get("truncated", False),
-                duration_ms=result.get("duration_ms"),
+                row_count=result.row_count,
+                truncated=result.truncated,
+                duration_ms=result.duration_ms,
             ),
         )
 

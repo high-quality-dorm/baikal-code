@@ -26,8 +26,5 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_temperature: float = 0.0
 
-    # Команда запуска шлюза db_mcp (используется MCP-клиентом по stdio).
-    db_mcp_command: str = "uv run db-mcp"
-
 
 settings = Settings()

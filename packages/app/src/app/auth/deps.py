@@ -1,16 +1,21 @@
-"""FastAPI-зависимости аутентификации и проверки ролей."""
+"""FastAPI-зависимости аутентификации.
+
+JWT несёт только `sub` = номер учётки (users.id). Идентичность и бизнес-роль
+резолвятся на каждый запрос через пакет db (`resolve_identity`/`resolve_role`):
+роль всегда свежая, а деактивированная учётка получает 401 сразу, а не на
+следующем логине.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from db_mcp.roles import BusinessRole
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.context import Context
 from app.core.security import decode_access_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -18,58 +23,59 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 @dataclass
 class AuthContext:
-    """Идентичность текущего пользователя из JWT."""
+    """Идентичность текущего пользователя из JWT (роль резолвится свежей)."""
 
-    user_id: str | None = None
+    user_id: int | None = None
     role: str | None = None
-    email: str | None = None
 
 
-def _context_from_token(token: str) -> AuthContext:
-    """Строит AuthContext из декодированного JWT (бросает jwt.PyJWTError)."""
-    payload = decode_access_token(token)
-    return AuthContext(
-        user_id=payload.get("sub"),
-        role=payload.get("role"),
-        email=payload.get("email"),
-    )
+def _decode_user_id(credentials: HTTPAuthorizationCredentials) -> int | None:
+    """Декодирует JWT и возвращает номер учётки (users.id) или None."""
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except jwt.PyJWTError:
+        return None
+    sub = payload.get("sub")
+    if isinstance(sub, str) and sub.isdigit():
+        return int(sub)
+    return None
 
 
-def get_current_user(
+async def _resolve_auth(ctx: Context, user_id: int) -> AuthContext:
+    """Резолвит идентичность и роль; отсутствующая/неактивная учётка — 401."""
+    identity = await ctx.gateway.resolve_identity(user_id)
+    if identity is None:
+        raise HTTPException(
+            status_code=401, detail="Учётная запись не найдена или деактивирована"
+        )
+    role = await ctx.gateway.resolve_role(user_id)
+    return AuthContext(user_id=user_id, role=role)
+
+
+async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    ctx: Context,
 ) -> AuthContext:
-    """Разбирает Bearer-токен; при отсутствии/невалидности — 401."""
+    """Требует валидный токен активной учётки; иначе 401."""
     if credentials is None:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
-    try:
-        return _context_from_token(credentials.credentials)
-    except jwt.PyJWTError:
+    user_id = _decode_user_id(credentials)
+    if user_id is None:
         raise HTTPException(status_code=401, detail="Невалидный или просроченный токен")
+    return await _resolve_auth(ctx, user_id)
 
 
-def get_optional_context(
+async def get_optional_context(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    ctx: Context,
 ) -> AuthContext:
-    """То же, но аноним при отсутствии/невалидном токене (для публичных эндпоинтов)."""
+    """То же, но аноним при отсутствии/невалидном токене (для публичных эндпоинтов).
+
+    Валидный токен неактивной/удалённой учётки — 401 (не молчаливый гость).
+    """
     if credentials is None:
         return AuthContext()
-    try:
-        return _context_from_token(credentials.credentials)
-    except jwt.PyJWTError:
+    user_id = _decode_user_id(credentials)
+    if user_id is None:
         return AuthContext()
-
-
-def require_role(*roles: BusinessRole) -> Callable[..., None]:
-    """Возвращает зависимость, требующую одну из указанных ролей (иначе 403).
-
-    Текущий пользователь берётся из Bearer-токена через get_current_user,
-    поэтому require_role можно передавать напрямую в Depends.
-    """
-
-    allowed = {role.value for role in roles}
-
-    def checker(ctx: Annotated[AuthContext, Depends(get_current_user)]) -> None:
-        if not ctx.role or ctx.role not in allowed:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
-    return checker
+    return await _resolve_auth(ctx, user_id)
