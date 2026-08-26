@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from app.agent.agent import Agent
 from app.context import AppContext, get_context
 from app.core.security import hash_password
 from app.main import create_app
 from app.services.auth import AuthService
-from app.services.pipeline import Pipeline
 from db.models import Identity, UserRecord
 from tests.fakes import FakeGateway, StubLLM
 
@@ -19,7 +19,9 @@ pytestmark = pytest.mark.usefixtures("rsa_keys")
 def _make_client(gw: FakeGateway) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_context] = lambda: AppContext(
-        gateway=gw, auth=AuthService(gw), pipeline=Pipeline(gw, StubLLM())
+        gateway=gw,
+        auth=AuthService(gw),
+        agent=Agent(gw, StubLLM(), max_steps=5),
     )
     return TestClient(app)
 

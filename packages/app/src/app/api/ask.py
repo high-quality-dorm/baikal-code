@@ -28,7 +28,16 @@ async def ask(
     """Отвечает на вопрос; агент сам решает, какие тулы вызывать."""
 
     async def gen():
-        async for event in ctx.agent.stream(question.text, user.user_id, user.role):
-            yield json.dumps(event, ensure_ascii=False) + "\n"
+        try:
+            async for event in ctx.agent.stream(question.text, user.user_id, user.role):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except Exception as exc:  # noqa: BLE001
+            yield (
+                json.dumps(
+                    {"type": "error", "message": f"Внутренняя ошибка: {exc}"},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")

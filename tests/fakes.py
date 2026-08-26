@@ -1,43 +1,41 @@
-"""Общие фейки тестов app: шлюз db без реальной БД.
+"""Общие фейки тестов app: шлюз db и LLM без реальной БД.
 
 `FakeGateway` реализует интерфейс `db.Gateway` в той части, которую использует
 приложение: резолюция identity/роли, учётные записи, схема и исполнение запроса.
+`StubLLM` — минимальный фейк LLM для сборки контекста, где агент не исполняется.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from db.gateway import GatewayError
 from db.models import Identity, QueryResult, SchemaDescription, UserRecord
+from langchain_core.messages import BaseMessage
+from langchain_core.messages.ai import AIMessageChunk
 
 
 class StubLLM:
-    """Минимальный фейк LLM (для сборки контекста, где pipeline не исполняется)."""
+    """Фейк LLM: отдаёт один текстовый чанк без вызовов тулов."""
 
-    async def generate_sql(
-        self, question: str, schema: str, role: str | None
-    ) -> str:
-        return "SELECT 1"
-
-    async def answer(
+    async def stream(
         self,
-        question: str,
-        sql: str,
-        columns: list[str],
-        rows: list[list[object]],
-    ) -> str:
-        return "Ответ"
+        messages: list[BaseMessage],
+        tools: list[dict[str, object]] | None = None,
+    ) -> AsyncIterator[AIMessageChunk]:
+        yield AIMessageChunk(content="Ответ")
 
 
 def make_context(gateway: FakeGateway) -> AppContext:
-    """Контекст на фейковом шлюзе: AuthService + Pipeline на заглушке LLM."""
+    """Контекст на фейковом шлюзе: AuthService + агент на заглушке LLM."""
+    from app.agent.agent import Agent
     from app.context import AppContext
     from app.services.auth import AuthService
-    from app.services.pipeline import Pipeline
 
     return AppContext(
         gateway=gateway,
         auth=AuthService(gateway),
-        pipeline=Pipeline(gateway, StubLLM()),
+        agent=Agent(gateway, StubLLM(), max_steps=5),
     )
 
 
@@ -54,6 +52,7 @@ class FakeGateway:
             columns=[], rows=[], row_count=0, truncated=False, duration_ms=0.0
         )
         self.gateway_error: Exception | None = None
+        self.execute_failures: list[str] = []
         self.get_schema_calls: list[int | None] = []
         self.execute_calls: list[tuple[str, int | None]] = []
 
@@ -89,6 +88,8 @@ class FakeGateway:
 
     async def execute_query(self, sql: str, user_id: int | None) -> QueryResult:
         self.execute_calls.append((sql, user_id))
+        if sql in self.execute_failures:
+            raise GatewayError("Разрешены только read-only запросы")
         if self.gateway_error is not None:
             raise self.gateway_error
         return self.result
