@@ -24,205 +24,158 @@
         <div class="kicker">Команда PC · Хакатон «Код Байкала» · 24–28 августа 2026</div>
         <h1>Baikal</h1>
         <p class="tagline">Спросите базу данных на человеческом языке</p>
-        <p class="sub">Безопасный text-to-SQL ассистент для университетской базы данных</p>
+        <p class="sub">ИИ-агент: сам напишет SQL, проверит, ответит и объяснит</p>
         <div class="url-chip">swe.vipono.online</div>
       </section>
 
       <section id="problem">
         <div class="kicker">Проблема</div>
-        <h2>Университет тонет в своих данных</h2>
+        <h2>Данные есть. Вопросов — тысячи. Ответов — мало.</h2>
+        <div class="content">
+          <p style="font-size:15pt; margin:0;">Приёмная комиссия каждый день отвечает на одно и то же. Декан ждёт цифры к совещанию. Цифры есть — они лежат в базе данных.</p>
+          <div class="fgrid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-terminal"></i></div>
+              <h3>Нужен SQL</h3>
+              <p>А SQL знают единицы — остальные просто ждут</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-file-lines"></i></div>
+              <h3>Отчёты вручную</h3>
+              <p>Таблицы для руководства собирают руками</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-inbox"></i></div>
+              <h3>Одно и то же</h3>
+              <p>Приёмная комиссия тонет в повторяющихся вопросах</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-lock"></i></div>
+              <h3>Чувствительные данные</h3>
+              <p>Персональные данные нельзя отдать «просто чату»</p>
+            </div>
+          </div>
+          <p class="punch">Это не проблема данных. <span class="hl">Это проблема доступа.</span></p>
+        </div>
+      </section>
+
+      <section id="naive">
+        <div class="kicker">Почему не «просто LLM»</div>
+        <h2>Посадить LLM на базу — плохая идея</h2>
+        <div class="content">
+          <div class="fgrid" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-robot"></i></div>
+              <h3>Уверенно выдумывает</h3>
+              <p>LLM придумает цифру — и будет звучать убедительно</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-eye-slash"></i></div>
+              <h3>Не видит ошибок</h3>
+              <p>Отправил запрос — и не узнает, выполнился ли он</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-user-shield"></i></div>
+              <h3>Не знает прав</h3>
+              <p>Не понимает, кому что можно видеть, а что — нет</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-lock"></i></div>
+              <h3>Чёрный ящик у данных</h3>
+              <p>Персональные данные нельзя доверить слепой модели</p>
+            </div>
+          </div>
+          <p class="punch">В университете это не «фича», а риск. <span class="hl">Поэтому мы сделали иначе.</span></p>
+        </div>
+      </section>
+
+      <section id="um-prava">
+        <div class="kicker">Наш ответ</div>
+        <h2>Мы разделили ум и права</h2>
         <div class="content">
           <div class="split">
-            <div class="col">
-              <div class="col-head">
-                <i class="fa-solid fa-circle-question"></i>
-                <span class="col-label">Что болит · люди</span>
-              </div>
-              <ul class="icon-list">
-                <li><i class="fa-solid fa-file-lines"></i><span>Чтобы получить цифры — <strong>нужно знать SQL</strong></span></li>
-                <li><i class="fa-solid fa-clock"></i><span>Отчёты для руководства собирают <strong>вручную</strong></span></li>
-                <li><i class="fa-solid fa-inbox"></i><span>Приёмная комиссия отвечает на <strong>однотипные вопросы</strong></span></li>
-                <li><i class="fa-solid fa-triangle-exclamation"></i><span>Нет <strong>безопасного и удобного</strong> инструмента доступа</span></li>
-              </ul>
-            </div>
             <div class="col tint">
               <div class="col-head">
-                <i class="fa-solid fa-database"></i>
-                <span class="col-label">Система · данные</span>
+                <i class="fa-solid fa-brain"></i>
+                <span class="col-label">Агент · ум</span>
               </div>
               <ul class="icon-list">
-                <li><i class="fa-solid fa-building-columns"></i><span>Студенты, планы, приёмная кампания — всё в <strong>PostgreSQL</strong></span></li>
-                <li><i class="fa-solid fa-users"></i><span>Данные нужны <strong>всем</strong>: от абитуриента до ректората</span></li>
-                <li><i class="fa-solid fa-bolt"></i><span>Неконтролируемые запросы <strong>перегружают систему</strong></span></li>
+                <li><i class="fa-solid fa-compass"></i><span>Сам решает, как ответить на вопрос</span></li>
+                <li><i class="fa-solid fa-terminal"></i><span>Пишет и запускает SQL через один инструмент</span></li>
+                <li><i class="fa-solid fa-rotate"></i><span>Видит ошибки шлюза — исправляет и повторяет</span></li>
+                <li><i class="fa-solid fa-comment"></i><span>Отвечает по-русски и объясняет, что сделал</span></li>
+              </ul>
+            </div>
+            <div class="col accent">
+              <div class="col-head">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span class="col-label">Шлюз · права</span>
+              </div>
+              <ul class="icon-list">
+                <li><i class="fa-solid fa-lock"></i><span>Только read-only SELECT</span></li>
+                <li><i class="fa-solid fa-list-check"></i><span>Whitelist · авто-LIMIT 200 · statement_timeout</span></li>
+                <li><i class="fa-solid fa-user-shield"></i><span>RLS: данные открыты строго по правилам</span></li>
+                <li><i class="fa-solid fa-file-signature"></i><span>Каждый запрос — в аудит-логе</span></li>
               </ul>
             </div>
           </div>
+          <p class="punch">Агент свободный — шлюз строгий. <span class="hl">Агент предлагает — шлюз решает.</span></p>
         </div>
       </section>
 
-      <section id="idea">
-        <div class="kicker">Идея</div>
-        <h2>Один инструмент для всех данных университета</h2>
+      <section id="agent-work">
+        <div class="kicker">Посмотрите, как он работает</div>
+        <h2>Агент виден в действии</h2>
         <div class="content">
-          <p class="pitch">Вопрос на естественном языке <span class="arrow">→</span> корректный SQL <span class="arrow">→</span> проверенный ответ</p>
-          <div class="value-row" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px;">
-            <div class="card">
-              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-shield-halved"></i></div>
-              <h3>Безопасно</h3>
-              <p class="text-muted">Только SELECT, Row-Level Security, персональные данные студентов под защитой</p>
-            </div>
-            <div class="card">
-              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-arrows-spin"></i></div>
-              <h3>Масштабируемо</h3>
-              <p class="text-muted">Асинхронно, под нагрузкой, встраивается как чат-виджет в любой сайт вуза</p>
-            </div>
-            <div class="card">
-              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-list-check"></i></div>
-              <h3>Контролируемо</h3>
-              <p class="text-muted">Лимиты строк и времени, аудит каждого запроса, ответ можно проверить</p>
-            </div>
+          <div class="chat">
+            <div class="row user"><div class="bubble">Сколько студентов на факультете ИТ?</div></div>
+            <div class="row"><span class="status"><span class="dot"></span>Загружаю схему…</span></div>
+            <div class="row"><span class="status"><span class="dot"></span>Собираю данные…</span></div>
+            <div class="row"><span class="status"><span class="dot"></span>Запрос не выполнился, исправляю SQL…</span></div>
+            <div class="row"><span class="status"><span class="dot"></span>Собираю данные…</span></div>
+            <div class="row"><div class="sql">SELECT COUNT(*) FROM students s JOIN groups g ON s.group_id = g.id JOIN faculties f ON g.faculty_id = f.id WHERE f.name = 'ИТ'</div></div>
+            <div class="row agent"><div class="bubble">На факультете ИТ обучается 152 студента.</div></div>
+            <div class="row"><span class="explain-line">Объяснение запроса: students → groups → faculties · JOIN · COUNT(*)</span></div>
           </div>
-          <p class="text-muted text-lg" style="font-size:15pt;">Цель: безопасный, масштабируемый и контролируемый доступ к данным через естественный язык</p>
-        </div>
-      </section>
-
-      <section id="pipeline">
-        <div class="kicker">Как это работает</div>
-        <h2>От вопроса к ответу — один строгий конвейер</h2>
-        <div class="content">
-          <div class="pipeline">
-            <div class="stage">
-              <div class="stage-title">Вопрос</div>
-              <div class="stage-sub">по-русски, в чате или API</div>
-            </div>
-            <span class="p-arrow">→</span>
-            <div class="stage">
-              <div class="stage-title">Схема БД</div>
-              <div class="stage-sub">маскированная под роль — в промпт LLM</div>
-            </div>
-            <span class="p-arrow">→</span>
-            <div class="stage">
-              <div class="stage-title">Тул-агент</div>
-              <div class="stage-sub">генерирует SQL · вызывает execute_query</div>
-            </div>
-            <span class="p-arrow">→</span>
-            <div class="stage accent">
-              <div class="stage-title">Шлюз db</div>
-              <div class="stage-sub">валидация · RLS · аудит</div>
-            </div>
-            <span class="p-arrow">→</span>
-            <div class="stage">
-              <div class="stage-title">Ответ</div>
-              <div class="stage-sub">NDJSON-поток + «Объяснение»</div>
-            </div>
-          </div>
-          <div class="split" style="grid-template-columns: 1fr 1fr;">
-            <div class="col tint">
-              <div class="col-head">
-                <i class="fa-solid fa-rotate"></i>
-                <span class="col-label">Самокоррекция</span>
-              </div>
-              <p class="text-muted" style="font-size:13.5pt;">При ошибке агент видит ответ шлюза, исправляет SQL и повторяет — данные не «придумываются»</p>
-            </div>
-            <div class="col">
-              <div class="col-head">
-                <i class="fa-solid fa-wave-square"></i>
-                <span class="col-label">Стриминг</span>
-              </div>
-              <p class="text-muted" style="font-size:13.5pt;">Ответ идёт потоком: статус → SQL → токены → done. Первый токен — сразу, без ожидания полного ответа</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="security">
-        <div class="kicker">Безопасность</div>
-        <h2>Три независимых уровня защиты</h2>
-        <div class="content">
-          <div class="levels">
-            <div class="level">
-              <div class="lv">1</div>
-              <div>
-                <h3>Роли PostgreSQL — принцип наименьших привилегий</h3>
-                <p>Рабочая роль <span class="mono">app_ro</span> — только чтение; служебная <span class="mono">app_service</span> — только для аудита и аутентификации</p>
-              </div>
-            </div>
-            <div class="level">
-              <div class="lv">2</div>
-              <div>
-                <h3>Row-Level Security — deny-by-default</h3>
-                <p>Доступ задаётся из <span class="mono">student_id</span> / <span class="mono">staff_id</span>: студент видит свои оценки, преподаватель — свои группы, администрация — всё</p>
-              </div>
-            </div>
-            <div class="level">
-              <div class="lv">3</div>
-              <div>
-                <h3>Публичные вью <span class="mono">v_*</span> — статистика без PII</h3>
-                <p>Численность студентов доступна всем, включая гостя, — но персональные данные не раскрываются</p>
-              </div>
-            </div>
-          </div>
-          <div class="pill-row">
-            <span class="pill">Только SELECT</span>
-            <span class="pill">Whitelist таблиц</span>
-            <span class="pill">Защита от SQL-инъекций (sqlglot)</span>
-            <span class="pill">Авто-LIMIT 200</span>
-            <span class="pill">statement_timeout 10 с</span>
-          </div>
+          <p class="note">Всё это — в реальном времени, потоком: видна каждая мысль агента. Он не «угадывает» ответ — он его добывает и чинит то, что не получилось.</p>
         </div>
       </section>
 
       <section id="roles">
-        <div class="kicker">Продукт</div>
-        <h2>Один чат — разные права для каждой роли</h2>
+        <div class="kicker">Агент знает, кто спрашивает</div>
+        <h2>Один агент — для всех. Каждому — своё.</h2>
         <div class="content">
-          <div class="roles">
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-door-open"></i></div>
-              <div class="role-name">Гость · абитуриент</div>
-              <h3>Направления и приём</h3>
-              <p>«Сколько бюджетных мест?» · «Проходные баллы прошлых лет»</p>
+          <div class="fgrid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-door-open"></i></div>
+              <h3>Гость · абитуриент</h3>
+              <p>Направления, места, проходные баллы — без входа</p>
             </div>
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-graduation-cap"></i></div>
-              <div class="role-name">Студент</div>
-              <h3>Своя успеваемость</h3>
-              <p>«Какой мой средний балл за семестр?» · «Есть ли задолженности?»</p>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-graduation-cap"></i></div>
+              <h3>Студент</h3>
+              <p>Свои оценки, задолженности, расписание</p>
             </div>
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-              <div class="role-name">Преподаватель</div>
-              <h3>Свои группы и дисциплины</h3>
-              <p>«Сколько студентов на моём курсе?» · «Средний балл по дисциплине»</p>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-chalkboard-user"></i></div>
+              <h3>Преподаватель</h3>
+              <p>Свои группы, баллы по своим дисциплинам</p>
             </div>
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-sitemap"></i></div>
-              <div class="role-name">Зав. кафедрой</div>
-              <h3>Кафедра</h3>
-              <p>«Учебная нагрузка кафедры» · «Студенты по предметам кафедры»</p>
-            </div>
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-user-tie"></i></div>
-              <div class="role-name">Декан</div>
-              <h3>Факультет</h3>
-              <p>«Численность факультета» · «Отчётность по успеваемости»</p>
-            </div>
-            <div class="role-card">
-              <div class="role-icon"><i class="fa-solid fa-landmark"></i></div>
-              <div class="role-name">Администрация</div>
-              <h3>Весь университет</h3>
-              <p>«Динамика набора по годам» · «Заполняемость аудиторий»</p>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-landmark"></i></div>
+              <h3>Администрация</h3>
+              <p>Всё: динамика набора, отчёты, аудитории</p>
             </div>
           </div>
-          <p class="text-muted mono" style="font-size:12pt;">Роль не хранится в БД — выводится из student_id / staff_id, доступ задаёт RLS. Данные студентов — только агрегаты или обезличенно.</p>
+          <div class="pill-row">
+            <span class="pill">Персональные данные студентов — только агрегаты или обезличенно</span>
+          </div>
+          <p class="punch">Права — не в чате, а в самой базе: <span class="hl">RLS решает, что агент увидит.</span> Он не может спросить то, что не положено.</p>
         </div>
       </section>
 
-      <section id="explain">
-        <div class="slide-head">
-          <div class="kicker">Прозрачность · Explainable AI</div>
-          <span class="pill">+10 баллов</span>
-        </div>
+      <section id="honesty">
+        <div class="kicker">Ему можно верить</div>
         <h2>Каждый ответ можно проверить</h2>
         <div class="content">
           <div style="display:grid; grid-template-columns: 1fr 1.1fr; gap:22px;">
@@ -235,132 +188,85 @@
               <span class="muted">Лимит</span> — 1 строка
             </div>
             <ul class="icon-list">
-              <li><i class="fa-solid fa-code"></i><span><strong>SQL раскрыт</strong> в интерфейсе — можно проверить каждую цифру</span></li>
+              <li><i class="fa-solid fa-code"></i><span><strong>SQL раскрыт</strong> — открой запрос и проверь любую цифру</span></li>
               <li><i class="fa-solid fa-table-list"></i><span><strong>Метаданные</strong>: строки · время · признак обрезки</span></li>
-              <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>Структурированный блок: таблицы, JOIN, фильтры, агрегаты</span></li>
-              <li><i class="fa-solid fa-eye-slash"></i><span>Цепочка рассуждений модели не раскрывается</span></li>
+              <li><i class="fa-solid fa-magnifying-glass-chart"></i><span><strong>Объяснение</strong>: таблицы, JOIN, фильтры, агрегаты</span></li>
+              <li><i class="fa-solid fa-circle-check"></i><span><strong>Только факты</strong> из базы — без выдуманных чисел</span></li>
             </ul>
           </div>
+          <p class="punch">В мире, где LLM уверенно выдумывают, <span class="hl">честность — это продукт.</span></p>
         </div>
       </section>
 
-      <section id="perf">
-        <div class="slide-head">
-          <div class="kicker">Производительность · Big Data</div>
-          <span class="pill">+10 баллов</span>
-        </div>
-        <h2>Быстро, даже когда запрос широкий</h2>
+      <section id="product">
+        <div class="kicker">Не прототип</div>
+        <h2>Собрано как продукт</h2>
         <div class="content">
           <div class="fgrid">
             <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-filter"></i></div>
-              <h3>Авто-LIMIT 200</h3>
-              <p>Большие выборки не выгружаются — срабатывает флаг <span class="mono">truncated</span></p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-robot"></i></div>
-              <h3>В LLM — только метаданные</h3>
-              <p>Массивы строк не передаются модели — экономия времени и денег</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-stopwatch"></i></div>
-              <h3>statement_timeout 10 с</h3>
-              <p>Ни один запрос не «зависает» — гарантия от перегрузки системы</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-gauge-high"></i></div>
-              <h3>Rate limiting</h3>
-              <p>Раздельные лимиты для авторизованных и гостей — стабильность под нагрузкой</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-wave-square"></i></div>
-              <h3>Асинхронный стриминг</h3>
-              <p>Ответ приходит потоком токенов — первый токен сразу</p>
-            </div>
-            <div class="fcard accent-bg">
-              <div class="ficon"><i class="fa-solid fa-bolt"></i></div>
-              <h3>Быстро и стабильно</h3>
-              <p>Широкие запросы — без потери скорости и деградации системы</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="engineering">
-        <div class="kicker">Технология</div>
-        <h2>Крепкий инженерный фундамент</h2>
-        <div class="content">
-          <p style="font-size:14.5pt; margin:0;">Единственный путь к базе — пакет <span class="mono">db</span>: валидация, RLS и аудит. Приложение напрямую в базу не ходит.</p>
-          <div class="fgrid">
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-bolt"></i></div>
-              <h3>Асинхронность</h3>
-              <p>FastAPI + asyncpg, NDJSON-стриминг без блокировок</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-layer-group"></i></div>
-              <h3>Параллелизм</h3>
-              <p>Пулы соединений по ролям — запросы пользователей не мешают друг другу</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-list-check"></i></div>
-              <h3>Аудит</h3>
-              <p>Каждый запрос фиксируется в <span class="mono">query_log</span>: кто, что, когда</p>
-            </div>
-            <div class="fcard">
-              <div class="ficon"><i class="fa-solid fa-vial-circle-check"></i></div>
-              <h3>Тесты</h3>
-              <p>199 тестов pytest: корректность, RLS-матрица, устойчивость</p>
+              <div class="ficon"><i class="fa-solid fa-globe"></i></div>
+              <h3>Работает в проде</h3>
+              <p>swe.vipono.online — вход, реальная БД, реальная модель</p>
             </div>
             <div class="fcard">
               <div class="ficon"><i class="fa-solid fa-puzzle-piece"></i></div>
               <h3>Встраиваемый виджет</h3>
-              <p>Чат для iframe на любом сайте университета — гостю и после входа</p>
+              <p>Чат появляется на любом сайте вуза — без перестройки его систем</p>
             </div>
-            <div class="fcard accent-bg">
-              <div class="ficon"><i class="fa-solid fa-globe"></i></div>
-              <h3>Работает в проде</h3>
-              <p>Live-развёртывание: nginx + бэкенд, внешняя БД — swe.vipono.online</p>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-bolt"></i></div>
+              <h3>Держит нагрузку</h3>
+              <p>Асинхронно, стриминг, rate limiting — широкие запросы не роняют систему</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-vial-circle-check"></i></div>
+              <h3>Проверено тестами</h3>
+              <p>199 тестов, RLS-матрица проверена на реальных данных</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-sliders"></i></div>
+              <h3>Настройка без кода</h3>
+              <p>Промпт, шаги агента, лимиты — в конфигурации, не в коде</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-layer-group"></i></div>
+              <h3>Растёт</h3>
+              <p>Тул-архитектура: execute_query — первый, новые инструменты добавляются модулями</p>
             </div>
           </div>
+          <p class="note">За 5 дней: схема с ролями и RLS · шлюз · агент · чат · виджет · деплой</p>
         </div>
       </section>
 
-      <section id="demo" class="section-divider demo-divider" data-state="is-section-divider demo-divider">
-        <h1>Демо</h1>
-        <p class="tagline">Живой продукт — спросим базу по-русски</p>
-        <p class="sub">swe.vipono.online · гость, студент, администрация</p>
+      <section id="scenario" class="section-divider scenario" data-state="is-section-divider scenario">
+        <div class="kicker">Сценарий · студент</div>
+        <h1>«Какое у меня расписание?»</h1>
+        <p class="tagline">Один вопрос — агент делает остальное</p>
+        <p class="sub">студент · свои занятия · свой семестр</p>
       </section>
 
       <section id="outro">
         <div class="kicker">Итог</div>
-        <h2>Baikal — продукт и технология в одном</h2>
+        <h2>Baikal — агент, которому можно доверить базу</h2>
         <div class="content">
-          <div class="split">
-            <div class="col tint">
-              <div class="col-head">
-                <i class="fa-solid fa-user-group"></i>
-                <span class="col-label">Продукт</span>
-              </div>
-              <p style="font-size:14pt;">Один чат для всего университета — от абитуриента до ректората. Отчёты — за минуты вместо дней, персональные данные под защитой.</p>
+          <div class="fgrid">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-brain"></i></div>
+              <h3>Агент, а не конвейер</h3>
+              <p>Думает, исправляет ошибки и объясняет каждый ответ</p>
             </div>
-            <div class="col">
-              <div class="col-head">
-                <i class="fa-solid fa-gears"></i>
-                <span class="col-label">Технология</span>
-              </div>
-              <p style="font-size:14pt;">Безопасный конвейер: только SELECT, RLS, аудит и 199 тестов. Асинхронно, под нагрузкой, встраивается в любую систему вуза.</p>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-shield-halved"></i></div>
+              <h3>Безопасность</h3>
+              <p>Шлюз, RLS, PII — правила соблюдает сама база, а не обещания</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-globe"></i></div>
+              <h3>Продукт в проде</h3>
+              <p>Работает и встраивается в университет — готов к использованию</p>
             </div>
           </div>
-          <div class="pill-row" style="justify-content:center;">
-            <span class="pill">Бизнес-кейс</span>
-            <span class="pill">Безопасность</span>
-            <span class="pill">Архитектура</span>
-            <span class="pill">Производительность</span>
-            <span class="pill">Explainable AI</span>
-            <span class="pill">Big Data</span>
-          </div>
-          <p class="thanks text-center" style="text-align:center;">Спасибо! Готовы к вопросам</p>
+          <p class="note">Дальше — больше инструментов агента: аналитика и отчёты на заказ.</p>
           <div style="display:flex; justify-content:center;">
             <div class="url-chip" style="margin-top:0;">Команда PC · swe.vipono.online</div>
           </div>

@@ -154,14 +154,16 @@
 }
 .reveal .slides section.section-divider .kicker { margin-bottom: 6px; }
 
-/* Demo divider — navy emphasis */
-.reveal-viewport.is-section-divider.demo-divider .slide-background.present {
+/* Scenario divider — navy emphasis */
+.reveal-viewport.is-section-divider.scenario .slide-background.present {
   background-color: var(--accent) !important;
 }
-.reveal .slides section.demo-divider h1 { color: #ffffff; }
-.reveal .slides section.demo-divider p { color: rgba(255, 255, 255, 0.9); }
-.reveal .slides section.demo-divider .tagline { color: #ffffff; }
-.reveal .slides section.demo-divider .sub { color: rgba(255, 255, 255, 0.85); }
+.reveal .slides section.scenario h1 { color: #ffffff; }
+.reveal .slides section.scenario p { color: rgba(255, 255, 255, 0.9); }
+.reveal .slides section.scenario .tagline { color: #ffffff; }
+.reveal .slides section.scenario .sub { color: rgba(255, 255, 255, 0.85); }
+.reveal .slides section.scenario .kicker { color: rgba(255, 255, 255, 0.85); }
+.reveal .slides section.scenario .kicker::before { background: #ffffff; }
 
 /* ===========================================
    TEXT UTILITIES
@@ -421,4 +423,79 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+/* Chat transcript (agent at work) */
+.chat {
+  border: 1px solid var(--border);
+  border-radius: var(--box-radius);
+  background: #ffffff;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.chat .row { display: flex; }
+.chat .row.user { justify-content: flex-end; }
+.chat .bubble {
+  max-width: 88%;
+  border-radius: 12px;
+  padding: 9px 15px;
+  font-size: 13pt;
+  line-height: 1.45;
+}
+.chat .row.user .bubble { background: var(--accent); color: #ffffff; }
+.chat .row.agent .bubble {
+  background: var(--accent-tint);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.chat .status {
+  font-family: var(--mono-font);
+  font-size: 11pt;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.chat .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.chat .sql {
+  font-family: var(--mono-font);
+  font-size: 11pt;
+  color: var(--text);
+  background: var(--accent-tint);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  line-height: 1.5;
+}
+.chat .explain-line {
+  font-family: var(--mono-font);
+  font-size: 10.5pt;
+  color: var(--muted);
+}
+
+/* Accent panel (split: ум/права) */
+.split .col.accent { background: var(--accent); border-color: var(--accent); }
+.split .col.accent .col-label,
+.split .col.accent .col-head i { color: #ffffff; }
+.split .col.accent .icon-list li { color: rgba(255, 255, 255, 0.92); }
+.split .col.accent .icon-list li i { color: #ffffff; }
+
+/* Punch line */
+.punch {
+  font-family: var(--heading-font);
+  font-weight: 500;
+  font-size: 18pt;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+}
+.punch .hl { color: var(--accent); }
+
+/* Note strip */
+.note {
+  font-size: 12.5pt;
+  color: var(--muted);
+  margin: 0;
 }
