@@ -4,8 +4,8 @@ import Logo from "../components/Logo.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import RoleBadge from "../components/RoleBadge.jsx";
 import SqlDisclosure from "../components/SqlDisclosure.jsx";
+import Markdown from "../components/Markdown.jsx";
 import { useAuth } from "../lib/auth.jsx";
-import { useTypewriter } from "../lib/typewriter.js";
 import { askStream, ApiError, EndpointMissingError } from "../lib/api.js";
 import { mockAnswer, SUGGESTED_QUESTIONS } from "../lib/mock.js";
 import {
@@ -26,17 +26,6 @@ function TypingDots() {
       <span />
       <span />
     </span>
-  );
-}
-
-function AssistantText({ text }) {
-  const visible = useTypewriter(text);
-  const done = visible >= text.length;
-  return (
-    <>
-      {text.slice(0, visible)}
-      {!done && <span className="stream-caret" aria-hidden="true" />}
-    </>
   );
 }
 
@@ -62,10 +51,8 @@ function Message({ message, meta, isLast, status = null, streaming = false }) {
             message.text
           ) : showDots ? (
             <TypingDots />
-          ) : streaming || message.streamed ? (
-            message.text
           ) : (
-            <AssistantText text={message.text} />
+            <Markdown text={message.text} />
           )}
           {meta?.error && <div style={{ marginTop: 6 }}>{meta.error}</div>}
         </div>
