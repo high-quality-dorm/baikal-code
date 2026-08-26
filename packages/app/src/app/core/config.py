@@ -29,5 +29,12 @@ class Settings(BaseSettings):
     # Тул-агент: максимум шагов LLM-цикла на вопрос (включая вызовы тулов).
     agent_max_steps: int = 5
 
+    # Rate limiting для /ask (скользящее окно, in-process). Ключ: для
+    # авторизованного — user_id, для гостя — IP. Раздельные лимиты, т.к. гость —
+    # главный вектор безвозмездного abuse платного LLM.
+    rate_limit_user_requests: int = 30
+    rate_limit_guest_requests: int = 10
+    rate_limit_window_seconds: int = 60
+
 
 settings = Settings()

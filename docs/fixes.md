@@ -17,7 +17,13 @@
 
 ---
 
-## Этап 1 — Rate limiting на `/ask`
+## Этап 1 — Rate limiting на `/ask` ✅ выполнено
+
+> Реализовано: `core/ratelimit.py` (`SlidingWindowLimiter`), параметры в
+> `core/config.py`/`.env.example` (`RATE_LIMIT_USER_REQUESTS`=30,
+> `RATE_LIMIT_GUEST_REQUESTS`=10, `RATE_LIMIT_WINDOW_SECONDS`=60), проверка в
+> `api/ask.py`, лимитер — одиночка в `AppContext`. Тесты в
+> `tests/core/test_ratelimit.py` и `tests/api/test_ask.py` (429). ADR 37.
 
 **Признак лимита (ключ)** зависит от того, кто запрашивает:
 

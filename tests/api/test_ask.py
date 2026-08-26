@@ -51,9 +51,8 @@ def _make_client(
 ) -> tuple[TestClient, FakeAgent]:
     app = create_app()
     fake = FakeAgent(error)
-    app.dependency_overrides[get_context] = lambda: AppContext(
-        gateway=gw, auth=AuthService(gw), agent=fake
-    )
+    ctx = AppContext(gateway=gw, auth=AuthService(gw), agent=fake)
+    app.dependency_overrides[get_context] = lambda: ctx
     return TestClient(app), fake
 
 
@@ -130,3 +129,72 @@ def test_ask_empty_question_is_422():
     client, _ = _make_client(_gateway_with_user())
     resp = client.post("/api/v1/ask", json={"text": ""})
     assert resp.status_code == 422
+
+
+def test_ask_guest_rate_limited(monkeypatch):
+    """Гость исчерпывает лимит → 429, агент не вызывается."""
+    from app.api import ask as ask_mod
+
+    monkeypatch.setattr(ask_mod, "settings", type("S", (), {
+        "rate_limit_user_requests": 30,
+        "rate_limit_guest_requests": 2,
+        "rate_limit_window_seconds": 60,
+    })())
+
+    client, fake = _make_client(_gateway_with_user())
+    for _ in range(2):
+        resp = client.post("/api/v1/ask", json={"text": "Сколько студентов?"})
+        assert resp.status_code == 200
+    resp = client.post("/api/v1/ask", json={"text": "Сколько студентов?"})
+    assert resp.status_code == 429
+    assert len(fake.calls) == 2
+
+
+def test_ask_authed_user_rate_limited(monkeypatch):
+    """Авторизованный исчерпывает свой лимит → 429."""
+    from app.api import ask as ask_mod
+
+    monkeypatch.setattr(ask_mod, "settings", type("S", (), {
+        "rate_limit_user_requests": 1,
+        "rate_limit_guest_requests": 10,
+        "rate_limit_window_seconds": 60,
+    })())
+
+    client, fake = _make_client(_gateway_with_user())
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "demo_student@example.com", "password": "password123"},
+    ).json()
+    headers = {"Authorization": f"Bearer {login['access_token']}"}
+
+    assert client.post(
+        "/api/v1/ask", json={"text": "Q"}, headers=headers
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/ask", json={"text": "Q"}, headers=headers
+    ).status_code == 429
+    assert len(fake.calls) == 1
+
+
+def test_ask_guest_and_authed_share_limiter(monkeypatch):
+    """Гость и авторизованный считаются раздельно (разные ключи)."""
+    from app.api import ask as ask_mod
+
+    monkeypatch.setattr(ask_mod, "settings", type("S", (), {
+        "rate_limit_user_requests": 30,
+        "rate_limit_guest_requests": 1,
+        "rate_limit_window_seconds": 60,
+    })())
+
+    client, fake = _make_client(_gateway_with_user())
+    assert client.post("/api/v1/ask", json={"text": "Q"}).status_code == 200
+    assert client.post("/api/v1/ask", json={"text": "Q"}).status_code == 429
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "demo_student@example.com", "password": "password123"},
+    ).json()
+    headers = {"Authorization": f"Bearer {login['access_token']}"}
+    assert client.post(
+        "/api/v1/ask", json={"text": "Q"}, headers=headers
+    ).status_code == 200
+    assert len(fake.calls) == 2

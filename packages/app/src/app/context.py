@@ -7,13 +7,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from db.gateway import Gateway
 from fastapi import Depends
 
 from app.agent.agent import Agent
+from app.core.ratelimit import SlidingWindowLimiter
 from app.services.auth import AuthService
 
 
@@ -24,6 +25,7 @@ class AppContext:
     gateway: Gateway
     auth: AuthService
     agent: Agent
+    limiter: SlidingWindowLimiter = field(default_factory=SlidingWindowLimiter)
 
 
 def get_context() -> AppContext:

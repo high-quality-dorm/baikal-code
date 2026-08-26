@@ -100,7 +100,8 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
 - `GET /api/v1/auth/users/me` — текущая учётка (`Me`) с производной ролью
   (для бейджа в интерфейсе).
 - `POST /api/v1/ask` — тул-агент; ответ — **NDJSON-поток**; **гость разрешён**
-  (без токена → `user_id=None`).
+  (без токена → `user_id=None`). Запрос ограничен rate limiting (см. ADR 37):
+  авторизованный — по `user_id`, гость — по IP; раздельные лимиты.
 
 Учётные записи и их связки `student_id`/`staff_id` заводятся **вне приложения**
 (сид / руками в БД): у app нет ни управления учётками, ни write-доступа к
@@ -133,9 +134,11 @@ FastAPI-приложение: тонкий HTTP-слой поверх `db`. Вс
 - `llm/` — `llm.py` (`ChatLLM.stream(messages, tools)` через `astream` +
   `bind_tools`, `LLMError`), `render.py` (`schema_to_text`).
 - `api/ask.py` — `POST /ask` через `get_optional_context`; отдаёт
-  `StreamingResponse` (NDJSON), формат событий — см. ADR 36.
-- `core/` — `config.py` (JWT + LLM + `agent_max_steps`), `security.py`
-  (bcrypt + JWT RS256).
+  `StreamingResponse` (NDJSON), формат событий — см. ADR 36; перед агентом —
+  проверка rate limit (см. ADR 37);
+- `core/` — `config.py` (JWT + LLM + `agent_max_steps` + параметры rate limit),
+  `security.py` (bcrypt + JWT RS256), `ratelimit.py` (`SlidingWindowLimiter` —
+  скользящее окно по ключу, in-process).
 
 App использует из `db` только: `get_user_by_login`, `get_user`,
 `resolve_identity`, `resolve_role`, `get_schema`, `execute_query`.
