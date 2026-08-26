@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baikal — команда PC</title>
+
+  <!-- Reveal.js core -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reset.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.css">
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <section id="title" class="section-divider" data-state="is-section-divider">
+        <div class="logo-badge"><span class="drop"></span></div>
+        <div class="kicker">Команда PC · Хакатон «Код Байкала» · 24–28 августа 2026</div>
+        <h1>Baikal</h1>
+        <p class="tagline">Спросите базу данных на человеческом языке</p>
+        <p class="sub">Безопасный text-to-SQL ассистент для университетской базы данных</p>
+        <div class="url-chip">swe.vipono.online</div>
+      </section>
+
+      <section id="problem">
+        <div class="kicker">Проблема</div>
+        <h2>Университет тонет в своих данных</h2>
+        <div class="content">
+          <div class="split">
+            <div class="col">
+              <div class="col-head">
+                <i class="fa-solid fa-circle-question"></i>
+                <span class="col-label">Что болит · люди</span>
+              </div>
+              <ul class="icon-list">
+                <li><i class="fa-solid fa-file-lines"></i><span>Чтобы получить цифры — <strong>нужно знать SQL</strong></span></li>
+                <li><i class="fa-solid fa-clock"></i><span>Отчёты для руководства собирают <strong>вручную</strong></span></li>
+                <li><i class="fa-solid fa-inbox"></i><span>Приёмная комиссия отвечает на <strong>однотипные вопросы</strong></span></li>
+                <li><i class="fa-solid fa-triangle-exclamation"></i><span>Нет <strong>безопасного и удобного</strong> инструмента доступа</span></li>
+              </ul>
+            </div>
+            <div class="col tint">
+              <div class="col-head">
+                <i class="fa-solid fa-database"></i>
+                <span class="col-label">Система · данные</span>
+              </div>
+              <ul class="icon-list">
+                <li><i class="fa-solid fa-building-columns"></i><span>Студенты, планы, приёмная кампания — всё в <strong>PostgreSQL</strong></span></li>
+                <li><i class="fa-solid fa-users"></i><span>Данные нужны <strong>всем</strong>: от абитуриента до ректората</span></li>
+                <li><i class="fa-solid fa-bolt"></i><span>Неконтролируемые запросы <strong>перегружают систему</strong></span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="idea">
+        <div class="kicker">Идея</div>
+        <h2>Один инструмент для всех данных университета</h2>
+        <div class="content">
+          <p class="pitch">Вопрос на естественном языке <span class="arrow">→</span> корректный SQL <span class="arrow">→</span> проверенный ответ</p>
+          <div class="value-row" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px;">
+            <div class="card">
+              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-shield-halved"></i></div>
+              <h3>Безопасно</h3>
+              <p class="text-muted">Только SELECT, Row-Level Security, персональные данные студентов под защитой</p>
+            </div>
+            <div class="card">
+              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-arrows-spin"></i></div>
+              <h3>Масштабируемо</h3>
+              <p class="text-muted">Асинхронно, под нагрузкой, встраивается как чат-виджет в любой сайт вуза</p>
+            </div>
+            <div class="card">
+              <div class="ficon" style="color:var(--accent); font-size:19pt; margin-bottom:12px;"><i class="fa-solid fa-list-check"></i></div>
+              <h3>Контролируемо</h3>
+              <p class="text-muted">Лимиты строк и времени, аудит каждого запроса, ответ можно проверить</p>
+            </div>
+          </div>
+          <p class="text-muted text-lg" style="font-size:15pt;">Цель: безопасный, масштабируемый и контролируемый доступ к данным через естественный язык</p>
+        </div>
+      </section>
+
+      <section id="pipeline">
+        <div class="kicker">Как это работает</div>
+        <h2>От вопроса к ответу — один строгий конвейер</h2>
+        <div class="content">
+          <div class="pipeline">
+            <div class="stage">
+              <div class="stage-title">Вопрос</div>
+              <div class="stage-sub">по-русски, в чате или API</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Схема БД</div>
+              <div class="stage-sub">маскированная под роль — в промпт LLM</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Тул-агент</div>
+              <div class="stage-sub">генерирует SQL · вызывает execute_query</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage accent">
+              <div class="stage-title">Шлюз db</div>
+              <div class="stage-sub">валидация · RLS · аудит</div>
+            </div>
+            <span class="p-arrow">→</span>
+            <div class="stage">
+              <div class="stage-title">Ответ</div>
+              <div class="stage-sub">NDJSON-поток + «Объяснение»</div>
+            </div>
+          </div>
+          <div class="split" style="grid-template-columns: 1fr 1fr;">
+            <div class="col tint">
+              <div class="col-head">
+                <i class="fa-solid fa-rotate"></i>
+                <span class="col-label">Самокоррекция</span>
+              </div>
+              <p class="text-muted" style="font-size:13.5pt;">При ошибке агент видит ответ шлюза, исправляет SQL и повторяет — данные не «придумываются»</p>
+            </div>
+            <div class="col">
+              <div class="col-head">
+                <i class="fa-solid fa-wave-square"></i>
+                <span class="col-label">Стриминг</span>
+              </div>
+              <p class="text-muted" style="font-size:13.5pt;">Ответ идёт потоком: статус → SQL → токены → done. Первый токен — сразу, без ожидания полного ответа</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="security">
+        <div class="kicker">Безопасность</div>
+        <h2>Три независимых уровня защиты</h2>
+        <div class="content">
+          <div class="levels">
+            <div class="level">
+              <div class="lv">1</div>
+              <div>
+                <h3>Роли PostgreSQL — принцип наименьших привилегий</h3>
+                <p>Рабочая роль <span class="mono">app_ro</span> — только чтение; служебная <span class="mono">app_service</span> — только для аудита и аутентификации</p>
+              </div>
+            </div>
+            <div class="level">
+              <div class="lv">2</div>
+              <div>
+                <h3>Row-Level Security — deny-by-default</h3>
+                <p>Доступ задаётся из <span class="mono">student_id</span> / <span class="mono">staff_id</span>: студент видит свои оценки, преподаватель — свои группы, администрация — всё</p>
+              </div>
+            </div>
+            <div class="level">
+              <div class="lv">3</div>
+              <div>
+                <h3>Публичные вью <span class="mono">v_*</span> — статистика без PII</h3>
+                <p>Численность студентов доступна всем, включая гостя, — но персональные данные не раскрываются</p>
+              </div>
+            </div>
+          </div>
+          <div class="pill-row">
+            <span class="pill">Только SELECT</span>
+            <span class="pill">Whitelist таблиц</span>
+            <span class="pill">Защита от SQL-инъекций (sqlglot)</span>
+            <span class="pill">Авто-LIMIT 200</span>
+            <span class="pill">statement_timeout 10 с</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="roles">
+        <div class="kicker">Продукт</div>
+        <h2>Один чат — разные права для каждой роли</h2>
+        <div class="content">
+          <div class="roles">
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-door-open"></i></div>
+              <div class="role-name">Гость · абитуриент</div>
+              <h3>Направления и приём</h3>
+              <p>«Сколько бюджетных мест?» · «Проходные баллы прошлых лет»</p>
+            </div>
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+              <div class="role-name">Студент</div>
+              <h3>Своя успеваемость</h3>
+              <p>«Какой мой средний балл за семестр?» · «Есть ли задолженности?»</p>
+            </div>
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+              <div class="role-name">Преподаватель</div>
+              <h3>Свои группы и дисциплины</h3>
+              <p>«Сколько студентов на моём курсе?» · «Средний балл по дисциплине»</p>
+            </div>
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-sitemap"></i></div>
+              <div class="role-name">Зав. кафедрой</div>
+              <h3>Кафедра</h3>
+              <p>«Учебная нагрузка кафедры» · «Студенты по предметам кафедры»</p>
+            </div>
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-user-tie"></i></div>
+              <div class="role-name">Декан</div>
+              <h3>Факультет</h3>
+              <p>«Численность факультета» · «Отчётность по успеваемости»</p>
+            </div>
+            <div class="role-card">
+              <div class="role-icon"><i class="fa-solid fa-landmark"></i></div>
+              <div class="role-name">Администрация</div>
+              <h3>Весь университет</h3>
+              <p>«Динамика набора по годам» · «Заполняемость аудиторий»</p>
+            </div>
+          </div>
+          <p class="text-muted mono" style="font-size:12pt;">Роль не хранится в БД — выводится из student_id / staff_id, доступ задаёт RLS. Данные студентов — только агрегаты или обезличенно.</p>
+        </div>
+      </section>
+
+      <section id="explain">
+        <div class="slide-head">
+          <div class="kicker">Прозрачность · Explainable AI</div>
+          <span class="pill">+10 баллов</span>
+        </div>
+        <h2>Каждый ответ можно проверить</h2>
+        <div class="content">
+          <div style="display:grid; grid-template-columns: 1fr 1.1fr; gap:22px;">
+            <div class="expl">
+              <div class="expl-title">Объяснение запроса</div>
+              <span class="muted">Таблицы</span> — students · groups · faculties<br>
+              <span class="muted">JOIN</span> — students → groups → faculties<br>
+              <span class="muted">Фильтры</span> — faculty.name = 'ИТ'<br>
+              <span class="muted">Агрегаты</span> — COUNT(*)<br>
+              <span class="muted">Лимит</span> — 1 строка
+            </div>
+            <ul class="icon-list">
+              <li><i class="fa-solid fa-code"></i><span><strong>SQL раскрыт</strong> в интерфейсе — можно проверить каждую цифру</span></li>
+              <li><i class="fa-solid fa-table-list"></i><span><strong>Метаданные</strong>: строки · время · признак обрезки</span></li>
+              <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>Структурированный блок: таблицы, JOIN, фильтры, агрегаты</span></li>
+              <li><i class="fa-solid fa-eye-slash"></i><span>Цепочка рассуждений модели не раскрывается</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="perf">
+        <div class="slide-head">
+          <div class="kicker">Производительность · Big Data</div>
+          <span class="pill">+10 баллов</span>
+        </div>
+        <h2>Быстро, даже когда запрос широкий</h2>
+        <div class="content">
+          <div class="fgrid">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-filter"></i></div>
+              <h3>Авто-LIMIT 200</h3>
+              <p>Большие выборки не выгружаются — срабатывает флаг <span class="mono">truncated</span></p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-robot"></i></div>
+              <h3>В LLM — только метаданные</h3>
+              <p>Массивы строк не передаются модели — экономия времени и денег</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-stopwatch"></i></div>
+              <h3>statement_timeout 10 с</h3>
+              <p>Ни один запрос не «зависает» — гарантия от перегрузки системы</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-gauge-high"></i></div>
+              <h3>Rate limiting</h3>
+              <p>Раздельные лимиты для авторизованных и гостей — стабильность под нагрузкой</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-wave-square"></i></div>
+              <h3>Асинхронный стриминг</h3>
+              <p>Ответ приходит потоком токенов — первый токен сразу</p>
+            </div>
+            <div class="fcard accent-bg">
+              <div class="ficon"><i class="fa-solid fa-bolt"></i></div>
+              <h3>Быстро и стабильно</h3>
+              <p>Широкие запросы — без потери скорости и деградации системы</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="engineering">
+        <div class="kicker">Технология</div>
+        <h2>Крепкий инженерный фундамент</h2>
+        <div class="content">
+          <p style="font-size:14.5pt; margin:0;">Единственный путь к базе — пакет <span class="mono">db</span>: валидация, RLS и аудит. Приложение напрямую в базу не ходит.</p>
+          <div class="fgrid">
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-bolt"></i></div>
+              <h3>Асинхронность</h3>
+              <p>FastAPI + asyncpg, NDJSON-стриминг без блокировок</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-layer-group"></i></div>
+              <h3>Параллелизм</h3>
+              <p>Пулы соединений по ролям — запросы пользователей не мешают друг другу</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-list-check"></i></div>
+              <h3>Аудит</h3>
+              <p>Каждый запрос фиксируется в <span class="mono">query_log</span>: кто, что, когда</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-vial-circle-check"></i></div>
+              <h3>Тесты</h3>
+              <p>199 тестов pytest: корректность, RLS-матрица, устойчивость</p>
+            </div>
+            <div class="fcard">
+              <div class="ficon"><i class="fa-solid fa-puzzle-piece"></i></div>
+              <h3>Встраиваемый виджет</h3>
+              <p>Чат для iframe на любом сайте университета — гостю и после входа</p>
+            </div>
+            <div class="fcard accent-bg">
+              <div class="ficon"><i class="fa-solid fa-globe"></i></div>
+              <h3>Работает в проде</h3>
+              <p>Live-развёртывание: nginx + бэкенд, внешняя БД — swe.vipono.online</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="section-divider demo-divider" data-state="is-section-divider demo-divider">
+        <h1>Демо</h1>
+        <p class="tagline">Живой продукт — спросим базу по-русски</p>
+        <p class="sub">swe.vipono.online · гость, студент, администрация</p>
+      </section>
+
+      <section id="outro">
+        <div class="kicker">Итог</div>
+        <h2>Baikal — продукт и технология в одном</h2>
+        <div class="content">
+          <div class="split">
+            <div class="col tint">
+              <div class="col-head">
+                <i class="fa-solid fa-user-group"></i>
+                <span class="col-label">Продукт</span>
+              </div>
+              <p style="font-size:14pt;">Один чат для всего университета — от абитуриента до ректората. Отчёты — за минуты вместо дней, персональные данные под защитой.</p>
+            </div>
+            <div class="col">
+              <div class="col-head">
+                <i class="fa-solid fa-gears"></i>
+                <span class="col-label">Технология</span>
+              </div>
+              <p style="font-size:14pt;">Безопасный конвейер: только SELECT, RLS, аудит и 199 тестов. Асинхронно, под нагрузкой, встраивается в любую систему вуза.</p>
+            </div>
+          </div>
+          <div class="pill-row" style="justify-content:center;">
+            <span class="pill">Бизнес-кейс</span>
+            <span class="pill">Безопасность</span>
+            <span class="pill">Архитектура</span>
+            <span class="pill">Производительность</span>
+            <span class="pill">Explainable AI</span>
+            <span class="pill">Big Data</span>
+          </div>
+          <p class="thanks text-center" style="text-align:center;">Спасибо! Готовы к вопросам</p>
+          <div style="display:flex; justify-content:center;">
+            <div class="url-chip" style="margin-top:0;">Команда PC · swe.vipono.online</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0,
+      controls: true,
+      progress: true,
+      slideNumber: false,
+      hash: true,
+      transition: 'slide',
+      center: false
+    });
+  </script>
+</body>
+</html>
