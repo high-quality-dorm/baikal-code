@@ -17,55 +17,66 @@
 
 ## Объёмы данных
 
-| Таблица             | Количество  |
-| ------------------- | ----------- |
-| faculties           | 5           |
-| departments         | 11          |
-| staff               | 111         |
-| specialties         | 26          |
-| groups              | 208         |
-| students            | 500         |
-| courses             | 645         |
-| academic_records    | 40 531      |
-| rooms               | 140         |
-| schedule_slots      | 3 350       |
-| admission_plans     | 182         |
-| admission_stats     | 182         |
+| Таблица          | Количество  |
+| ---------------- | ----------- |
+| faculties        | 5           |
+| departments      | 11          |
+| specializations  | 26          |
+| groups           | 208         |
+| staff            | 111         |
+| teachers         | 88          |
+| students         | 500         |
+| classrooms       | 140         |
+| lessons          | 3 907       |
+| marks            | 9 086       |
+| users            | 6           |
+| admission_*      | по годам 2019–2026 |
 
 ## Демо-пользователи
 
-Таблица `users` содержит 4 записи (external_id → роль + внутренний id), все
-активны и имеют логин (`email = <external_id>@example.com`) и общий демо-пароль:
+Таблица `users` содержит 6 записей. Роль нигде не хранится — она выводится из
+`student_id`/`staff_id` (для сотрудников — из `staff.position`). Все активны,
+логин — `email`, общий демо-пароль `password123`:
 
-| external_id    | role    | internal_id | email (логин)              | пароль      |
-| -------------- | ------- | ----------- | -------------------------- | ----------- |
-| demo_applicant | applicant | —          | demo_applicant@example.com | password123 |
-| demo_student   | student | student_id 1 | demo_student@example.com | password123 |
-| demo_teacher   | teacher | staff_id 4   | demo_teacher@example.com | password123 |
-| demo_admin     | admin   | —           | demo_admin@example.com   | password123 |
+| email                     | student_id | staff_id (→ роль)        | Кто                                |
+| ------------------------- | ---------- | ------------------------ | ---------------------------------- |
+| demo_student@example.com  | 1          | —                        | студент                            |
+| demo_teacher@example.com  | —          | 4 (teacher)              | преподаватель                      |
+| demo_head@example.com     | —          | 3 (head)                 | зав. кафедрой                      |
+| demo_dean@example.com     | —          | 2 (dean)                 | декан                              |
+| demo_admin@example.com    | —          | 1 (admin)                | администрация                      |
+| demo_user@example.com     | —          | —                        | гость-пользователь (без id)        |
 
 Пароль хранится как bcrypt-хэш (`password_hash`). Вход в веб-интерфейс —
 по `email` и паролю.
 
 ## Верификация RLS на данных
 
-Контекст RLS задаётся в начале транзакции:
-`SET LOCAL app.role = 'student' | 'teacher' | 'admin'; SET LOCAL app.user_id = '<internal_id>';`
+Контекст RLS задаётся в начале транзакции двумя независимыми GUC (роль не
+передаётся):
+`SET LOCAL app.student_id = '<id>'; SET LOCAL app.staff_id = '<id>';`
 
-Проверенная матрица (на засеянных данных):
+Проверенная матрица (на засеянных данных, `app_ro`):
 
-| Роль      | Что видит                                                                   |
-| --------- | --------------------------------------------------------------------------- |
-| student   | только свои записи (`academic_records`), только свою строку в `students`    |
-| teacher   | только оценки по своим курсам (через `course_instructors`)                  |
-| admin     | все записи и всех студентов, включая PII (name/surname/patronymic/passport) |
+| Контекст                                  | students | marks | Общие таблицы |
+| ----------------------------------------- | -------- | ----- | ------------- |
+| гость (нет GUC)                           | 0        | 0     | видно         |
+| студент (`app.student_id = 1`)            | 1 (своя) | 10    | видно         |
+| преподаватель (`app.staff_id = 4`)        | 89       | 1 046 | видно         |
+| зав. кафедрой (`app.staff_id = 3`)        | 107      | 1 109 | видно         |
+| декан (`app.staff_id = 2`)                | 107      | 1 925 | видно         |
+| админ (`app.staff_id = 1`)                | 500      | 9 086 | видно         |
 
-Пример (студент): с `app.role='student'`, `app.user_id='1'` — 120 своих записей из
-40 531 в таблице; в `students` — 1 строка.
+Пример (студент): с `app.student_id='1'` в `students` — 1 строка (своя), в
+`marks` — 10 своих записей из 9 086.
 
 ## Замечания по реализации
 
-- Курсы привязаны к кафедре факультета; преподаватели назначаются **из кафедры курса**
-  (1–2 на курс) — для корректной работы RLS-политики преподавателя.
-- PII-поля студентов (`name`, `surname`, `patronymic`, `passport`) генерируются
-  детерминированно и уникальны (passport — с проверкой уникальности).
+- Дисциплины привязаны к кафедре факультета; преподаватели назначаются из
+  кафедры предмета (6–10 на кафедру) — для корректной работы RLS-политики
+  преподавателя.
+- Демо-пользователи связываются с конкретными студентами/сотрудниками через
+  `student_id`/`staff_id`; `demo_user` без id проверяет путь «гостя».
+- PII-поля студентов (`name`, `surname`, `patronymic`) генерируются
+  детерминированно; их видимость задаёт RLS (кто видит строку, тот видит и её
+  PII-поля).

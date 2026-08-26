@@ -606,7 +606,12 @@ async def seed_admission(ctx: SeedContext) -> None:
 
 
 async def seed_users(ctx: SeedContext) -> None:
-    """Демо-пользователи платформы (маппинг на студентов/сотрудников)."""
+    """Демо-пользователи платформы (маппинг на студентов/сотрудников).
+
+    student_id/staff_id — необязательные расширители доступа. demo_user без
+    обоих id видит только общую информацию (как гость) — проверка пути
+    «пользователь без идентичности».
+    """
     demo_password = "password123"
     demo_hash = bcrypt.hashpw(demo_password.encode(), bcrypt.gensalt()).decode()
 
@@ -624,10 +629,9 @@ async def seed_users(ctx: SeedContext) -> None:
         )
     if ctx.admin_ids:
         entries.append(("demo_admin", None, ctx.admin_ids[0]))
+    entries.append(("demo_user", None, None))
 
     for external_id, student_id, staff_id in entries:
-        if student_id is None and staff_id is None:
-            continue
         await ctx.conn.execute(
             "INSERT INTO users (student_id, staff_id, email, password_hash, is_active) "
             "VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (email) DO NOTHING",

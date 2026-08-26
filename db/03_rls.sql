@@ -1,15 +1,29 @@
--- Row-Level Security: роли и скоуп доступа (deny-by-default).
+-- Row-Level Security: скоуп доступа (deny-by-default), set-based.
 -- Исполняется от имени app_owner (POSTGRES_USER).
 --
--- Контекст задаёт шлюз в начале транзакции:
---   SET LOCAL app.role   = 'student' | 'teacher' | 'head' | 'dean' | 'admin';
---   SET LOCAL app.user_id = '<student_id | staff_id>';
--- Без контекста строк не видно (deny-by-default).
+-- Контекст задаёт шлюз в начале транзакции двумя независимыми GUC:
+--   SET LOCAL app.student_id = '<student_id>';   -- если у пользователя есть студент
+--   SET LOCAL app.staff_id   = '<staff_id>';     -- если у пользователя есть сотрудник
 --
--- Важно: после SET LOCAL app.user_id в завершившейся транзакции переменная на
+-- Роль НЕ передаётся строкой и единый user_id не вводится. Доступ выводится
+-- аддитивно из студенческого и/или кадрового id пользователя:
+--   - app.student_id даёт доступ к своей строке students и своим marks;
+--   - app.staff_id даёт скоуп по должности (teacher/head/dean/admin) через
+--     отношение к staff: преподаватель -> свои занятия, зав.кафедрой -> кафедра,
+--     декан -> факультет, админ -> всё.
+-- Пользователь, имеющий оба id, автоматически получает объединение скоупов.
+--
+-- Скоупы зав.кафедрой, декана и администрации дополнительно проверяют
+-- должность (position): иначе любой преподаватель, у которого заполнен
+-- department_id/faculty_id, получил бы доступ к скоупам кафедры/факультета.
+--
+-- Гость (нет app.student_id и app.staff_id): students/marks не видны вовсе
+-- (deny-by-default); общие таблицы открыты через app_ro без RLS.
+--
+-- Важно: после SET LOCAL в завершившейся транзакции переменная на
 -- переиспользуемом соединении пула принимает значение '' (пустая строка), а не
--- NULL. Поэтому все касты ::int обёрнуты в NULLIF(..., '') — иначе ''::int
--- упал бы при следующем запросе на том же соединении (гость и т.п.).
+-- NULL. Поэтому все касты ::int обёрнуты в NULLIF(..., '') — иначе ''::int упал
+-- бы при следующем запросе на том же соединении (гость и т.п.).
 
 -- ===== students =====
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
@@ -19,44 +33,42 @@ DROP POLICY IF EXISTS students_deny ON students;
 CREATE POLICY students_deny ON students FOR SELECT
     USING (false);
 
--- студент видит только свою строку
+-- сам студент видит свою строку
 DROP POLICY IF EXISTS students_self ON students;
 CREATE POLICY students_self ON students FOR SELECT
     USING (
-        current_setting('app.role', true) = 'student'
-        AND current_setting('app.user_id', true) = students.id::text
+        students.id = NULLIF(current_setting('app.student_id', true), '')::int
     );
 
 -- преподаватель видит студентов групп, которые ходят на его занятия
 DROP POLICY IF EXISTS students_teacher ON students;
 CREATE POLICY students_teacher ON students FOR SELECT
     USING (
-        current_setting('app.role', true) = 'teacher'
-        AND EXISTS (
+        EXISTS (
             SELECT 1 FROM lesson_group lg
             JOIN lessons l ON l.id = lg.lesson_id
-            WHERE l.teacher_id = NULLIF(current_setting('app.user_id', true), '')::int
+            WHERE l.teacher_id = NULLIF(current_setting('app.staff_id', true), '')::int
               AND lg.group_id = students.group_id
         )
     );
 
 -- зав. кафедрой видит студентов групп, которые ходят на занятия по предметам
--- своей кафедры. Скоуп считается через lessons (открытая таблица), а не через
--- marks: marks сам под RLS, и ссылка на него из политики students вызвала бы
--- бесконечную рекурсию политик (marks_dean ссылается на students).
+-- своей кафедры. Должность проверяется явно (иначе скоуп получил бы любой
+-- преподаватель кафедры). Скоуп считается через lessons (открытая таблица), а
+-- не через marks: marks сам под RLS, и ссылка на него из политики students
+-- вызвала бы бесконечную рекурсию политик (marks_dean ссылается на students).
 DROP POLICY IF EXISTS students_head ON students;
 CREATE POLICY students_head ON students FOR SELECT
     USING (
-        current_setting('app.role', true) = 'head'
-        AND EXISTS (
+        EXISTS (
             SELECT 1 FROM lesson_group lg
             JOIN lessons l ON l.id = lg.lesson_id
             JOIN subjects s ON s.id = l.subject_id
+            JOIN staff st
+              ON st.id = NULLIF(current_setting('app.staff_id', true), '')::int
+             AND st.position_id = (SELECT id FROM positions WHERE title = 'head')
             WHERE lg.group_id = students.group_id
-              AND s.department_id = (
-                  SELECT department_id FROM staff
-                  WHERE staff.id = NULLIF(current_setting('app.user_id', true), '')::int
-              )
+              AND s.department_id = st.department_id
         )
     );
 
@@ -64,22 +76,27 @@ CREATE POLICY students_head ON students FOR SELECT
 DROP POLICY IF EXISTS students_dean ON students;
 CREATE POLICY students_dean ON students FOR SELECT
     USING (
-        current_setting('app.role', true) = 'dean'
-        AND EXISTS (
+        EXISTS (
             SELECT 1 FROM groups g
             JOIN specializations sp ON sp.id = g.specialization_id
+            JOIN staff st
+              ON st.id = NULLIF(current_setting('app.staff_id', true), '')::int
+             AND st.position_id = (SELECT id FROM positions WHERE title = 'dean')
             WHERE g.id = students.group_id
-              AND sp.faculty_id = (
-                  SELECT faculty_id FROM staff
-                  WHERE staff.id = NULLIF(current_setting('app.user_id', true), '')::int
-              )
+              AND sp.faculty_id = st.faculty_id
         )
     );
 
 -- администрация видит всех
 DROP POLICY IF EXISTS students_admin ON students;
 CREATE POLICY students_admin ON students FOR SELECT
-    USING (current_setting('app.role', true) = 'admin');
+    USING (
+        EXISTS (
+            SELECT 1 FROM staff
+            WHERE staff.id = NULLIF(current_setting('app.staff_id', true), '')::int
+              AND staff.position_id = (SELECT id FROM positions WHERE title = 'admin')
+        )
+    );
 
 -- ===== marks =====
 ALTER TABLE marks ENABLE ROW LEVEL SECURITY;
@@ -93,18 +110,16 @@ CREATE POLICY marks_deny ON marks FOR SELECT
 DROP POLICY IF EXISTS marks_student ON marks;
 CREATE POLICY marks_student ON marks FOR SELECT
     USING (
-        current_setting('app.role', true) = 'student'
-        AND marks.student_id = NULLIF(current_setting('app.user_id', true), '')::int
+        marks.student_id = NULLIF(current_setting('app.student_id', true), '')::int
     );
 
 -- преподаватель видит оценки по своим предметам
 DROP POLICY IF EXISTS marks_teacher ON marks;
 CREATE POLICY marks_teacher ON marks FOR SELECT
     USING (
-        current_setting('app.role', true) = 'teacher'
-        AND marks.subject_id IN (
+        marks.subject_id IN (
             SELECT DISTINCT l.subject_id FROM lessons l
-            WHERE l.teacher_id = NULLIF(current_setting('app.user_id', true), '')::int
+            WHERE l.teacher_id = NULLIF(current_setting('app.staff_id', true), '')::int
         )
     );
 
@@ -112,13 +127,13 @@ CREATE POLICY marks_teacher ON marks FOR SELECT
 DROP POLICY IF EXISTS marks_head ON marks;
 CREATE POLICY marks_head ON marks FOR SELECT
     USING (
-        current_setting('app.role', true) = 'head'
-        AND marks.subject_id IN (
-            SELECT s.id FROM subjects s
-            WHERE s.department_id = (
-                SELECT department_id FROM staff
-                WHERE staff.id = NULLIF(current_setting('app.user_id', true), '')::int
-            )
+        EXISTS (
+            SELECT 1 FROM subjects s
+            JOIN staff st
+              ON st.id = NULLIF(current_setting('app.staff_id', true), '')::int
+             AND st.position_id = (SELECT id FROM positions WHERE title = 'head')
+            WHERE s.department_id = st.department_id
+              AND marks.subject_id = s.id
         )
     );
 
@@ -126,20 +141,25 @@ CREATE POLICY marks_head ON marks FOR SELECT
 DROP POLICY IF EXISTS marks_dean ON marks;
 CREATE POLICY marks_dean ON marks FOR SELECT
     USING (
-        current_setting('app.role', true) = 'dean'
-        AND EXISTS (
-            SELECT 1 FROM students st
-            JOIN groups g ON g.id = st.group_id
+        EXISTS (
+            SELECT 1 FROM students st_
+            JOIN groups g ON g.id = st_.group_id
             JOIN specializations sp ON sp.id = g.specialization_id
-            WHERE st.id = marks.student_id
-              AND sp.faculty_id = (
-                  SELECT faculty_id FROM staff
-                  WHERE staff.id = NULLIF(current_setting('app.user_id', true), '')::int
-              )
+            JOIN staff st
+              ON st.id = NULLIF(current_setting('app.staff_id', true), '')::int
+             AND st.position_id = (SELECT id FROM positions WHERE title = 'dean')
+            WHERE st_.id = marks.student_id
+              AND sp.faculty_id = st.faculty_id
         )
     );
 
 -- администрация видит все оценки
 DROP POLICY IF EXISTS marks_admin ON marks;
 CREATE POLICY marks_admin ON marks FOR SELECT
-    USING (current_setting('app.role', true) = 'admin');
+    USING (
+        EXISTS (
+            SELECT 1 FROM staff
+            WHERE staff.id = NULLIF(current_setting('app.staff_id', true), '')::int
+              AND staff.position_id = (SELECT id FROM positions WHERE title = 'admin')
+        )
+    );

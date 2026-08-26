@@ -13,27 +13,33 @@
 packages/app  (FastAPI, конвейер text-to-SQL)
    │  1. аутентификация (JWT: вход по логину/паролю; sub = users.id)
    │  2. генерация SQL через LLM (OpenAI-совместимый API, конфигурируемый)
-   │  3. ролевое маскирование схемы (get_schema)
-   │  4. вызов шлюза (MCP, stdio transport; передаётся users.id)
+   │  3. маскированное описание схемы под пользователя (get_schema)
+   │  4. вызов шлюза (передаётся users.id)
    │  5. пересказ результата по-русски вторым LLM-вызовом
    ▼
-packages/db_mcp  (ЕДИНСТВЕННЫЙ шлюз к БД)
-   │  - резолюция users.id → internal_id (через app_service)
-   │  - доступ к БД, RLS-контекст (app.user_id = internal_id), аудит
+packages/db  (ЕДИНСТВЕННЫЙ шлюз к БД)
+   │  - резолюция identity: users.id → {student_id, staff_id} (+ роль из staff.position)
+   │  - доступ к БД, RLS-контекст (app.student_id / app.staff_id), аудит
    │  - приложение НЕ ходит в БД напрямую
    ▼
-PostgreSQL (roles + column-masking + RLS)
+PostgreSQL (roles + set-based RLS)
 ```
 
-**Identity (важно):** шлюз принимает `execute_query(sql, role, user_id)`, где
-`user_id` — **номер учётки** (`users.id`, он же `sub` из JWT). Шлюз сам резолвит
-его в доменный `internal_id` (student_id/staff_id) через служебную роль
-`app_service` и ставит `app.user_id = internal_id` для RLS. В `query_log.user_id`
-пишется номер учётки (`users.id`). Приложение не знает про `internal_id`.
+**Identity (важно):** шлюз принимает `execute_query(sql, user_id)`, где `user_id` —
+**номер учётки** (`users.id`, он же `sub` из JWT). Шлюз сам резолвит через
+служебную роль `app_service` два независимых поля — `student_id` и `staff_id` —
+и ставит `app.student_id`/`app.staff_id` для RLS. Роль строкой не передаётся и
+не вводится единый `user_id`: скоуп выводится аддитивно из этих двух id
+(гость — только общие таблицы). В `query_log.user_id` пишется номер учётки
+(`users.id`). Приложение не знает про доменные id.
 
 Ключевой принцип: **приложение никогда не обращается к базе напрямую**. Весь доступ
-идёт только через `db_mcp`, где сосредоточены безопасность, валидация, ролевое
-маскирование схемы и аудит.
+идёт только через `db`, где сосредоточены безопасность, валидация, маскирование
+схемы и аудит.
+
+> Примечание: пакеты `db_mcp`/`app` в текущем виде описывают старую модель
+> доступа (роль строкой, `internal_id`, MCP-шлюз) и будут перестроены с нуля
+> под описанную выше set-based модель.
 
 ## Пакеты (uv workspace)
 
@@ -145,49 +151,58 @@ React (Vite) SPA — веб-интерфейс по [design.md](design.md). Ст
 
 Безопасность строится тремя независимыми слоями, которые усиливают друг друга:
 
-1. **Роли PostgreSQL** (`db/02_roles.sql`):
-   - `app_ro` — рабочая read-only роль. SELECT на все таблицы, но **без** PII-колонок
-     студентов (`name`, `surname`, `patronymic`, `passport`) и без служебных таблиц
-     `users`, `query_log`.
-   - `app_admin` — как `app_ro` + права на PII-колонки студентов.
-   - `app_service` — служебная роль приложения: запись в `query_log` + чтение/запись
-     `users` (для auth) + резолюция identity для RLS; пользователям недоступна,
-     прав на доменные таблицы не имеет.
+1. **Роли PostgreSQL** (`db/02_roles.sql`), принцип наименьших привилегий:
+   - `app_ro` — единственная рабочая read-only роль. SELECT на все доменные
+     таблицы; скоуп строк задаёт RLS. Служебные таблицы `users` и `query_log`
+     для неё закрыты.
+   - `app_service` — служебная роль приложения: запись в `query_log` (аудит),
+     чтение/запись `users` (auth) и чтение `staff`/`positions` (резолюция
+     identity для RLS). Пользователям недоступна, прав на доменные таблицы
+     (кроме колонок staff/positions, нужных для резолюции) не имеет.
 
-2. **Колоночное сокрытие PII** — даже если роль угадана, колонки персональных данных
-   физически недоступны для `app_ro`. Сначала снимается табличный SELECT со `students`,
-   затем выдаётся SELECT только на безопасные колонки (иначе табличная привилегия
-   перекрывает колоночный REVOKE).
-
-3. **Row-Level Security** (`db/03_rls.sql`), deny-by-default:
-   - контекст задаётся шлюзом в начале транзакции:
-     `SET LOCAL app.role = 'student' | 'teacher' | 'admin'; SET LOCAL app.user_id = '<internal_id>';`
-     где `internal_id` шлюз резолвит из `users.id`;
-   - без контекста строк не видно;
+2. **Row-Level Security** (`db/03_rls.sql`), deny-by-default, set-based:
+   - контекст задаётся шлюзом в начале транзакции **двумя независимыми GUC**:
+     `SET LOCAL app.student_id = '<student_id>'; SET LOCAL app.staff_id = '<staff_id>';`
+     — роль строкой и единый `user_id` не используются;
+   - доступ выводится **аддитивно** из студенческого и/или кадрового id:
+     `app.student_id` даёт свою строку в `students` и свои оценки в `marks`;
+     `app.staff_id` — скоуп по должности (`teacher` → свои занятия, `head` →
+     кафедра, `dean` → факультет, `admin` → всё);
+   - без контекста строк не видно (гость видит только общие таблицы без RLS);
    - студент видит только свою строку в `students` и только свои оценки;
-   - преподаватель видит оценки только по своим курсам;
+   - преподаватель — студентов групп своих занятий и оценки по своим предметам;
+   - зав. кафедрой — студентов групп по предметам своей кафедры и оценки по ним;
+   - декан — студентов своего факультета и их оценки;
    - администрация видит всё.
 
 ## Модель доступа (identity)
 
-- Таблица `users`: маппинг внешнего пользователя на внутренние идентификаторы:
-  `external_id` → `role` + `internal_id` (student_id или staff_id) + `display_name`.
-  Для auth добавлены колонки: `email` (логин, UNIQUE), `password_hash` (bcrypt),
-  `is_active` (деактивация учётки вместо удаления).
+- Таблица `users`: `id`, необязательные `student_id`/`staff_id` (связь с
+  доменными сущностями), `email` (логин, UNIQUE), `password_hash` (bcrypt),
+  `is_active` (деактивация учётки вместо удаления). **Роль строкой не хранится.**
 - **Identity в потоке запроса:** JWT `sub` = номер учётки (`users.id`). Шлюз
-  `execute_query` принимает `users.id` и сам резолвит его в `internal_id` через
-  `app_service` (`SELECT internal_id FROM users WHERE id = $1`), затем ставит
-  `app.user_id = internal_id` для RLS. В `query_log.user_id` пишется `users.id`.
-  Приложение не знает про `internal_id`; админ задаёт его при создании учётки.
-- Роли бизнес-уровня (applicant/student/teacher/admin) и PII-политика описаны в
-  [roles.md](roles.md).
-- Канонические значения ролей — `BusinessRole` в
-  `packages/db_mcp/src/db_mcp/roles.py`; маппинг бизнес-ролей на пулы
-  PostgreSQL — единый словарь `_BUSINESS_ROLE_TO_POOL` в `access.py`.
+  принимает `users.id` и сам резолвит через `app_service` два поля —
+  `student_id` и `staff_id` — из `users` (а роль персонала — из `staff.position`),
+  затем ставит `app.student_id`/`app.staff_id` для RLS. Приложение не знает про
+  доменные id; они задаются при создании учётки.
+- **Гость:** запрос без `user_id` (или у пользователя нет ни `student_id`, ни
+  `staff_id`) — RLS deny-by-default на `students`/`marks`, открыты только общие
+  таблицы (факультеты, направления, аудитории, расписание, приёмная кампания и
+  т.п.). Это соответствует сценарию «абитуриент/гость».
+- Роли бизнес-уровня и PII-политика описаны в [roles.md](roles.md).
+- Пользователь с обоими id получает **объединение** скоупов студента и
+  сотрудника.
 
 ## Схема БД
 
-17 таблиц: `faculties`, `departments`, `roles`, `staff`, `specialties`,
-`student_statuses`, `groups`, `students`, `courses`, `course_instructors`,
-`academic_records`, `rooms`, `schedule_slots`, `admission_plans`, `admission_stats`,
-`users`, `query_log`. Полное определение — в `db/01_schema.sql`.
+22 таблицы: `buildings`, `faculties`, `departments`, `specializations`, `groups`,
+`student_statuses`, `students`, `positions`, `staff`, `subjects`, `terms`,
+`classrooms`, `lessons`, `lesson_group`, `marks`, `users`, `admission_campaigns`,
+`admission_committees`, `admission_committee_members`, `admission_plans`,
+`admission_stats`, `query_log`. Полное определение — в `db/01_schema.sql`.
+Ключевые особенности:
+- `users` не хранит роль — она выводится динамически (`student_id` → студент,
+  `staff_id` → роль из `staff.position`);
+- `students.name/surname/patronymic` — персональные данные; видимость задаёт
+  RLS (кто видит строку студента, тот видит и её PII-поля);
+- служебные `users`/`query_log` закрыты для бизнес-роли.

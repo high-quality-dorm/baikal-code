@@ -129,14 +129,17 @@ CREATE TABLE marks (
 );
 
 -- 16. Пользователи платформы (auth + маппинг на студента/сотрудника)
+-- student_id/staff_id — необязательные «расширители» доступа: дают доступ к
+-- данным студента/сотрудника соответственно. Пользователь без обоих видит
+-- только общую информацию (как гость). Роль строкой не хранится — она
+-- выводится динамически из staff.position и/или наличия student_id.
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     student_id INT REFERENCES students(id),
     staff_id INT REFERENCES staff(id),
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    CHECK (student_id IS NOT NULL OR staff_id IS NOT NULL)
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- 17. Приёмные кампании (по годам)
@@ -231,3 +234,5 @@ CREATE INDEX idx_admission_plans_campaign ON admission_plans(campaign_id);
 CREATE INDEX idx_admission_plans_specialization ON admission_plans(specialization_id);
 CREATE INDEX idx_admission_stats_campaign ON admission_stats(campaign_id);
 CREATE INDEX idx_admission_stats_specialization ON admission_stats(specialization_id);
+CREATE INDEX idx_users_student ON users(student_id);
+CREATE INDEX idx_users_staff ON users(staff_id);
