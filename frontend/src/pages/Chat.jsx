@@ -184,6 +184,8 @@ export default function Chat() {
             truncated: query.truncated,
             duration_ms: query.duration_ms,
           };
+          // Инструмент execute_query сработал — показываем, что идёт сбор данных.
+          setStatus("Собираю данные…");
         },
         onDone: (meta) => finish(answerText, meta, null),
         onError: (message) => finish("", null, message),
